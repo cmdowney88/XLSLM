@@ -21,9 +21,7 @@ from torch.nn.modules.transformer import (
 )
 
 from .lattice import AcyclicLattice
-from .segmental_transformer import (
-    SegmentalTransformerEncoder
-)
+from .segmental_transformer import (SegmentalTransformerEncoder)
 
 
 class SegmentalLanguageModel(nn.Module):
@@ -147,14 +145,6 @@ class SegmentalLanguageModel(nn.Module):
         device = torch.device('cuda' if using_cuda else 'cpu')
 
         max_seg_len = min(max_seg_len, seq_length - 2)
-        
-        # Initialize the score for each possible segment to an approximation of
-        # infinity (log probability)
-        loginf = 1000000.0
-        segment_scores = torch.empty(
-            seq_length - 1, max_seg_len, batch_size
-        ).fill_(-loginf).to(device)
-        total_loss = 0
 
         # If expected length is to be calculated, ensure that the length
         # exponent is set to a valid value
@@ -194,6 +184,50 @@ class SegmentalLanguageModel(nn.Module):
 
         nn_start_time = time.time()
 
+        # Compute the embeddings and encoder outputs from the input sequences
+        embedded_seq, encoder_output = self.encoder_compute(
+            data, lengths, max_seg_len, device
+        )
+
+        # Compute the probability scores of segments of each length starting at
+        # each position using the embeddings and encoder outputs
+        segment_scores = self.decoder_compute(
+            seq_length, max_seg_len, batch_size, eoseg_index, data,
+            embedded_seq, encoder_output, device, range_by_length,
+            chars_to_subword_id
+        )
+
+        nn_time = time.time() - nn_start_time
+        lattice_start_time = time.time()
+
+        # Compute the best paths and loss(es) from the lattice
+        latticeComputeTuple = self.lattice_compute(
+            lengths, max_seg_len, segment_scores, device, length_exponent,
+            length_penalty_lambda, calculate_length_expectation
+        )
+
+        lattice_time = time.time() - lattice_start_time
+
+        time_profile = {}
+        time_profile['nn'] = nn_time
+        time_profile['lattice'] = lattice_time
+
+        return *latticeComputeTuple, time_profile
+
+    def encoder_compute(
+        self, data: Tensor, lengths: List[int], max_seg_len: int, device
+    ) -> Tuple[Tensor, Tensor]:
+        """
+        Compute the embeddings from data and pass them through the
+        encoder
+
+        Args:
+            data: The batch of input sequences
+            lengths: The list of the real (unpadded) lengths for each sequence
+            max_seg_len: The maximum segment length to be encoded
+            device: torch.device value denoting if model is on CPU or CUDA
+
+        """
         # Embed the input batch
         embedded_seq = self.embedding(data)
 
@@ -205,7 +239,48 @@ class SegmentalLanguageModel(nn.Module):
             mask_type=self.mask_type,
             max_seg_len=max_seg_len
         )
-        
+
+        return embedded_seq, encoder_output
+
+    def decoder_compute(
+        self,
+        seq_length: int,
+        max_seg_len: int,
+        batch_size: int,
+        eoseg_index: int,
+        data: Tensor,
+        embedded_seq: Tensor,
+        encoder_output: Tensor,
+        device,
+        range_by_length: dict,
+        chars_to_subword_id: dict = None,
+    ) -> Tensor:
+        """
+        Prepare the decoder input, h and c from the encoder output and
+        embeddings and pass them through the decoder to obtain segment scores
+
+        Args:
+            seq_length: The length of the maximum padded input sequence
+            max_seg_len: The maximum segment length to be encoded
+            batch_size: The number of input sequences in each batch
+            eoseg_index: The index of the <eoseg> (end-of-segment) character
+            data: The batch of input sequences
+            embedded_seq: The embeddings of the input sequences
+            encoder_output: The output from the context encoder
+            device: torch.device value denoting if model is on CPU or CUDA
+            range_by_length: A mapping of segment length to range of positions
+                that can start the corresponding segment.
+            chars_to_subword_id: A mapping of character-index tuples to the
+                indices of the subword/segment they constitute. Default:
+                ``None``
+        """
+
+        loginf = 1000000.0
+        # Initialize the score for each possible segment to an approximation of
+        # infinity (log probability)
+        segment_scores = torch.empty(seq_length - 1, max_seg_len,
+                                     batch_size).fill_(-loginf).to(device)
+
         # Use the context encodings to create start symbols and initial hidden
         # states for the segment decoder, as well as the lexicon probabilities,
         # if it is being used
@@ -263,9 +338,8 @@ class SegmentalLanguageModel(nn.Module):
 
                 # Add negative infinity probs to the end of the logits to allow
                 # OOV subwords to not be a problem for torch.gather
-                oov_probs = torch.empty(
-                    (num_seg_starts, batch_size, 1)
-                ).fill_(-loginf).to(device)
+                oov_probs = torch.empty((num_seg_starts, batch_size, 1)
+                                       ).fill_(-loginf).to(device)
                 subword_logits = torch.cat((subword_logits, oov_probs), dim=2)
 
                 # Gather the scores for the relevant subwords
@@ -364,8 +438,38 @@ class SegmentalLanguageModel(nn.Module):
                     seg_probs = seg_probs + sw_probs
                 segment_scores[range_start:range_end, k, :] = seg_probs
 
-        nn_time = time.time() - nn_start_time
-        lattice_start_time = time.time()
+        return segment_scores
+
+    def lattice_compute(
+        self,
+        lengths: List[int],
+        max_seg_len: int,
+        segment_scores: Tensor,
+        device,
+        length_exponent: int = 2,
+        length_penalty_lambda: float = None,
+        calculate_length_expectation: bool = False
+    ):
+        """
+        Form a lattice over the batch sequences using the segment scores and use
+        it to obtain the best paths and loss(es)
+
+        Args:
+            lengths: The list of the real (unpadded) lengths for each sequence
+            max_seg_len: The maximum segment length to be encoded
+            segment_scores: The probability scores of segments of each length
+                starting at each position and ending with <eoseg>
+            device: torch.device value denoting if model is on CPU or CUDA
+            length_exponent: The exponent to which to raise each segment length
+                if expected length regularization is being used. Default: 2
+            length_penalty_lambda: The lambda used to control the strength of
+                the expected length penalty. If ``None``, expected length will
+                not be calculated at all. Default: ``None``
+            calculate_length_expectation: Boolean value denoting whether
+                expected length value is to be calculated. Default: ``False``
+        """
+
+        loginf = 1000000.0
 
         # For the sake of decoding, the sequence length will be the length
         # including <eos> but not <bos>.
@@ -395,9 +499,6 @@ class SegmentalLanguageModel(nn.Module):
         marginals = marginals / lengths_wo_bos_tensor
         best_paths, _ = lattice.best_path()
 
-        time_profile = {}
-        time_profile['nn'] = nn_time
-
         # If a length expectation penalty is being computed, combine it with the
         # main (bpc) loss, then return both the penalized and unpenalized loss,
         # along with the best paths. Otherwise, just return the main loss and
@@ -411,17 +512,11 @@ class SegmentalLanguageModel(nn.Module):
             total_loss = total_losses.mean()
             bpc_loss = marginals.mean().item()
 
-            lattice_time = time.time() - lattice_start_time
-            time_profile['lattice'] = lattice_time
-
-            return total_loss, bpc_loss, best_paths, time_profile
+            return total_loss, bpc_loss, best_paths
         else:
             total_loss = marginals.mean()
 
-            lattice_time = time.time() - lattice_start_time
-            time_profile['lattice'] = lattice_time
-
-            return total_loss, best_paths, time_profile
+            return total_loss, best_paths
 
 
 class SLMEncoder(nn.Module):
@@ -451,7 +546,7 @@ class SLMEncoder(nn.Module):
             before the masked/unknown span
         max_seq_length: The absolute max sequence length expected to be encoded
             (used for sinusoidal positional encoding). Default: 4096
-        smart_position: Whether to learn the proportion with which to add the 
+        smart_position: Whether to learn the proportion with which to add the
             original and positional embeddings at each position. Adds a linear
             layer with ``2 * encoder_dim`` parameters. Default: ``False``
     """
@@ -494,30 +589,35 @@ class SLMEncoder(nn.Module):
         # If the encoder is to be transformer-based, initialize the Positional
         # Encoding component and set the h and c state to None
         if self.enc_type == 'transformer':
-            
+
             # Register a static sinusoidal positional encoding, as well as an
             # optional feedforward layer to determine the relative strength of
             # the original and positional embeddings
             pe = np.zeros((max_seq_length, encoder_dim))
             for pos in range(max_seq_length):
                 for i in range(0, math.ceil(encoder_dim / 2)):
-                    pe[pos, 2 * i] = np.sin(pos / (10000 ** (2 * i / encoder_dim)))
+                    pe[pos,
+                       2 * i] = np.sin(pos / (10000**(2 * i / encoder_dim)))
                     if 2 * i + 1 < encoder_dim:
-                        pe[pos, 2 * i + 1] = np.cos(pos / (10000 ** (2 * i / encoder_dim)))
+                        pe[pos, 2 * i + 1] = np.cos(
+                            pos / (10000**(2 * i / encoder_dim))
+                        )
             model_dtype = self.input_to_enc_dim.weight.dtype
             pe = torch.tensor(pe, dtype=model_dtype).unsqueeze(1)
             self.register_buffer('pe', pe)
             if smart_position:
-                self.positional_emb_proportion = nn.Linear(2 * encoder_dim, 1, bias=False)
+                self.positional_emb_proportion = nn.Linear(
+                    2 * encoder_dim, 1, bias=False
+                )
                 self.positional_emb_proportion.weight.data.fill_(0.0001)
                 self.emb_scale_factor = None
             else:
                 self.positional_emb_proportion = None
                 self.emb_scale_factor = nn.Parameter(torch.tensor([1.0]))
-            
+
             self.h_init_state = None
             self.c_init_state = None
-            
+
             # A transformer-based encoder has the additional option of being run
             # as an autoencoder (i.e. having no positions masked out). This is
             # not a language model in the traditional sense
@@ -540,7 +640,7 @@ class SLMEncoder(nn.Module):
                     ffwd_dim=ffwd_dim,
                     dropout=encoder_dropout
                 )
-        
+
         # If the encoder is to be lstm-based, initialize the h and c initial
         # states, also set the positional encoding to be None
         elif self.enc_type == 'lstm':
