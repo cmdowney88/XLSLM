@@ -307,67 +307,14 @@ class SegmentalLanguageModel(nn.Module):
             start_symbols = all_start_symbols[range_start:range_end, :, :]
             h = all_h[range_start:range_end, :, :]
 
+            # Obtain the subword probability scores and lexical proportions if
+            # a lexicon is being used
             if self.use_lexicon:
-                # Get the subword logits for the current range and convert them
-                # probabilities with softmax. Shape is
-                # (num_seg_starts, batch_size, subword_vocab_size)
-                subword_logits = all_subword_probs[range_start:range_end, :, :]
-                base_logit_size = subword_logits.size(-1)
-                # Also get the lexical proportions for this range. Shape is
-                # (num_seg_starts, batch_size)
-                lexical_proportions = all_lex_proportions[
-                    range_start:range_end, :]
-
-                # Create the matrix of subword ids with which to index the
-                # logits, adding an additional index at the end for OOV
-                # subwords
-                subword_ids = np.zeros((num_seg_starts, batch_size, seg_len))
-                for i in range(num_seg_starts):
-                    real_i = i - range_start
-                    for j in range(batch_size):
-                        for k in range(seg_len):
-                            seg = data[real_i + 1:real_i + k + 2, j].tolist()
-                            seg = tuple(seg)
-                            if seg in chars_to_subword_id:
-                                subword_ids[i, j, k] = chars_to_subword_id[seg]
-                            else:
-                                subword_ids[i, j, k] = base_logit_size
-                subword_ids = (
-                    torch.tensor(subword_ids, dtype=torch.int64).to(device)
+                subword_losses, lexical_proportions, character_proportions = self.lexicon_decoder(
+                    all_subword_probs, all_lex_proportions, data,
+                    num_seg_starts, seg_len, batch_size, range_start, range_end, device,
+                    chars_to_subword_id
                 )
-
-                # Add negative infinity probs to the end of the logits to allow
-                # OOV subwords to not be a problem for torch.gather
-                oov_probs = torch.empty((num_seg_starts, batch_size, 1)
-                                       ).fill_(-loginf).to(device)
-                subword_logits = torch.cat((subword_logits, oov_probs), dim=2)
-
-                # Gather the scores for the relevant subwords
-                subword_losses = torch.gather(
-                    subword_logits, dim=2, index=subword_ids
-                )
-
-                # Transpose the subword losses to be
-                # (seg_len, num_seg_starts, batch_size), allowing it to be added
-                # to the character scores later on
-                subword_losses = (
-                    subword_losses.transpose(1, 2).transpose(0, 1)
-                )
-
-                # Repeat the lexical mixture proportion to be the same for all
-                # segment lengths starting at the same position. It is now shape
-                # (seg_len, num_seg_starts, batch_size)
-                lexical_proportions = lexical_proportions.repeat(seg_len, 1, 1)
-                # Set the lexical mixture proportion to 0 where the given
-                # subword is OOV
-                zeroed_proportions = torch.zeros_like(lexical_proportions)
-                lexical_proportions = torch.where(
-                    subword_losses > -loginf, lexical_proportions,
-                    zeroed_proportions
-                )
-                # Set the character mixture proportion as 1 minus the lexical
-                # proportion
-                character_proportions = 1 - lexical_proportions
 
             # Create a matrix of the 'masked' (original) segments to be fed to
             # the decoder, as well as the matrix of targets to compare against.
@@ -517,6 +464,100 @@ class SegmentalLanguageModel(nn.Module):
             total_loss = marginals.mean()
 
             return total_loss, best_paths
+
+    def lexicon_decoder(
+        self,
+        all_subword_probs: Tensor,
+        all_lex_proportions: Tensor,
+        data: Tensor,
+        num_seg_starts: int,
+        seg_len: int,
+        batch_size: int,
+        range_start: int,
+        range_end: int,
+        device,
+        chars_to_subword_id: dict = None
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """
+        If a lexicon is being used, use the lexicon probabilities to compute the
+        scores for the relevant subwords
+
+        Args:
+            all_subword_probs: The subword probabilities obtained via the
+                lexicon based on the encoder output
+            all_lex_proportions: The lexicon proportions obtained via the
+                lexicon based on the encoder output
+            data : The batch of input sequences
+            seg_len: The length of each segment
+            num_seg_starts : The number of segments into which the input
+                sequence can be broken down
+            batch_size: The number of input sequences in each batch
+            range_start: The starting position of the first segment with the
+                given segment length
+            range_end: The starting position of the final segment with the
+                given segment length
+            device: torch.device value denoting if model is on CPU or CUDA
+            chars_to_subword_id: A mapping of character-index tuples to the
+                indices of the subword/segment they constitute. Default:
+                ``None``
+        """
+
+        loginf = 1000000.0
+
+        # Get the subword logits for the current range and convert them
+        # probabilities with softmax. Shape is
+        # (num_seg_starts, batch_size, subword_vocab_size)
+        subword_logits = all_subword_probs[range_start:range_end, :, :]
+        base_logit_size = subword_logits.size(-1)
+        # Also get the lexical proportions for this range. Shape is
+        # (num_seg_starts, batch_size)
+        lexical_proportions = all_lex_proportions[range_start:range_end, :]
+
+        # Create the matrix of subword ids with which to index the
+        # logits, adding an additional index at the end for OOV
+        # subwords
+        subword_ids = np.zeros((num_seg_starts, batch_size, seg_len))
+        for i in range(num_seg_starts):
+            real_i = i - range_start
+            for j in range(batch_size):
+                for k in range(seg_len):
+                    seg = data[real_i + 1:real_i + k + 2, j].tolist()
+                    seg = tuple(seg)
+                    if seg in chars_to_subword_id:
+                        subword_ids[i, j, k] = chars_to_subword_id[seg]
+                    else:
+                        subword_ids[i, j, k] = base_logit_size
+        subword_ids = (torch.tensor(subword_ids, dtype=torch.int64).to(device))
+
+        # Add negative infinity probs to the end of the logits to allow
+        # OOV subwords to not be a problem for torch.gather
+        oov_probs = torch.empty((num_seg_starts, batch_size, 1)
+                               ).fill_(-loginf).to(device)
+        subword_logits = torch.cat((subword_logits, oov_probs), dim=2)
+
+        # Gather the scores for the relevant subwords
+        subword_losses = torch.gather(subword_logits, dim=2, index=subword_ids)
+
+        # Transpose the subword losses to be
+        # (seg_len, num_seg_starts, batch_size), allowing it to be added
+        # to the character scores later on
+        subword_losses = (subword_losses.transpose(1, 2).transpose(0, 1))
+
+        # Repeat the lexical mixture proportion to be the same for all
+        # segment lengths starting at the same position. It is now shape
+        # (seg_len, num_seg_starts, batch_size)
+        lexical_proportions = lexical_proportions.repeat(seg_len, 1, 1)
+        # Set the lexical mixture proportion to 0 where the given
+        # subword is OOV
+        zeroed_proportions = torch.zeros_like(lexical_proportions)
+        lexical_proportions = torch.where(
+            subword_losses > -loginf, lexical_proportions, zeroed_proportions
+        )
+        # Set the character mixture proportion as 1 minus the lexical
+        # proportion
+        character_proportions = 1 - lexical_proportions
+
+        return subword_losses, lexical_proportions, character_proportions
 
 
 class SLMEncoder(nn.Module):
