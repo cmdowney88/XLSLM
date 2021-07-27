@@ -8,11 +8,11 @@ inin kal beyeho
 inin kal amo byeho
 inin kal blanko
 inin kal amo blanko
-kinan nes yelin kal?
+kinan nes yelin kal ?
 kix wel wei yelin kal
 yankwih yelin kal ?
-si, yankwih
-no, amo yankwih
+si , yankwih
+no , amo yankwih
 si no
 newal ni kwahtik
 tewal ti kwahtik
@@ -70,7 +70,7 @@ yelin nawa blanko i prieto
 mo kabayo blanko o prieto
 no kabayo amo blanko ni prieto no kabayo yel amo blanko
 kinán onka in takwal
-totonki in takwál 
+totonki in takwál
 in takwál istik
 istik in ati
 de mas istik in ati
@@ -82,10 +82,10 @@ yelin komi t amo limpyo
 in pweblo serka de nika
 in pweblo wehka de nika
 wehka in pweblo
-in xwan onka a$ka tepí 
+in xwan onka a$ka tepí
 a$ka in xwan onka tepí
 kaha onka a$ka in xwan
-a$ka onka tepí 
+a$ka onka tepí
 tepí yel kaha onka
 yalwa in xwan u yé tepí
 kaha u yé in xwan yalwa
@@ -97,7 +97,7 @@ no papa amo onka pa kal
 no papa syempre onka pa kal
 syempre no papa ye n pa kal
 no papa onka pa milpa
-no papa onka pa merkado 
+no papa onka pa merkado
 no papa onka aska pa atenko
 no papa onka nawak in manwél
 nawak ak onka mo papa
@@ -106,9 +106,9 @@ kaha onka in komi t
 kaha onka in machete
 in komi t ompa tal pa
 in machete ompa tal pa
-in komi t onka pa yelin rrinkón 
-in machete onka pa yelin rrinkón 
-in komi t onka serka in komál 
+in komi t onka pa yelin rrinkón
+in machete onka pa yelin rrinkón
+in komi t onka serka in komál
 kaha onka in pelo ?
 onka kyawah de in kal
 onka kal itik de in kal
@@ -159,7 +159,7 @@ kinán nesi ni itsu in xwan
 ni tsonti in xwan tel prieto
 ni ki piya in machete del ti nic tanwei
 todabia ni ki piya in machete del ti nich regalo
-pal in no kal  ni ki piya se machete del amo de nel
+pal in no kal ni ki piya se machete del amo de nel
 inin kamisa ki piya mancha
 inin pelo ki piya mancha
 in takwál ki piya istat
@@ -194,7 +194,7 @@ pa in komi t onka ati
 pa in komi t amo onka ati
 ona e$o t pa in komi t
 amo onka e$o t pa in komi t
-si, onka
+si , onka
 no amo onka
 pa in monte amo onka masa t
 pa in kal onka xente
@@ -219,7 +219,7 @@ ak yelin profesór ?
 xwan yel no pil tsi de nal
 xwan tel no pil tsi
 ten tel xwan ?
-xwan tel maestro?
+xwan tel maestro ?
 nel no ta tsi manwél
 nel ni pil tsi in manwél
 nel amo notatsi manwél
@@ -244,11 +244,11 @@ no chikiwi t amo yel
 de ak yel telin chikiwi t ?
 de tel yelin chikiwi t ?
 amo de tel yelin chikiwi t ?
-yelin chikiwi t yel de tel ? 
+yelin chikiwi t yel de tel ?
 in yelin ohti
 xwan tel de santa teresa
 de kaha xwan ?
-de kaha tal?
+de kaha tal ?
 ak yel de santa teresa ?
 xwan yel se taka t bewno
 xwan te s mo chiwa s presidente
@@ -418,7 +418,7 @@ yelin toto t amo wel patani a
 amo wel ni tehko a pa in kwawi t
 amo wel kalaki yá pa in kal porke tsakwa ti ka á in pwerta
 ti podero s ti pano s pa atenko kwak ki piya tepito ati
-ni ki mati ni eskriniro a pero amo wel, porke amo ni ki piya lapis
+ni ki mati ni eskriniro a pero amo wel , porke amo ni ki piya lapis
 ni ki neki ni tehko s pa yelin kwawi t pero amo wel
 wel ni tehko a pa yelin kwawi t pero amo ni ki neki
 ni ki piya ten ni tekipano s

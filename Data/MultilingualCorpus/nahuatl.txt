@@ -1,67 +1,67 @@
-inin kal i, weyi
-inin kal e, a'mo weyi
-inin kal e, tepi to
-inin kal e, a'mo tepi to
-inin kal e, yankwwik
-inin kal e, a'mo yankwwik
-inin kal e, biexo
-inin kal e, a'mo biexo
-inin kal e, ista:k
-inin kal e, a'mo ista:k
+inin kal i , weyi
+inin kal e , a'mo weyi
+inin kal e , tepi to
+inin kal e , a'mo tepi to
+inin kal e , yankwwik
+inin kal e , a'mo yankwwik
+inin kal e , biexo
+inin kal e , a'mo biexo
+inin kal e , ista:k
+inin kal e , a'mo ista:k
 kenin ka inon kai e ?
-molwe weyi, inon kal e ?
-yankwik, inon kal e ?
-ke:me, yankwik
-a'mo, a'mo, yankwik
+molwe weyi , inon kal e ?
+yankwik , inon kal e ?
+ke:me , yankwik
+a'mo , a'mo , yankwik
 ke:me a'mo
-ne'wa, ni kwohtik
-te'wa, ti kwohtik
-ye'wa ci, ti kwohitk ci
-ye'wa, kwohitk
-te'wan tin, ti kwohtik e
-name'wan tin, nan kwohtik e
-ye'wan tin, kwohtik e
-ne'wa, ni tepi to
-te'wa, te tepi to
-te'wa ci, ti tepi to ci
-ye'wa, tepi to
-ye'wa, tepi to
-te'wan tin, ti tepi to ton
-name'wan tin, nan tepi to ton
-name'wan tin cin, nan tepi ton ci ci
-ye'wan tin, tepi to ton
-ye'wan tin, tepi to ton
-ne'wa, ni toma:wa k
-te'wa, ti toma:wa k
-te'wa ci, ti toma:wa k
-ye'wa, toma:wa k
-ye'wa, toma:wa k
-te'wan tin, ti toma:wa k e
-name'wan tin, nan toma:wa ke e
-name'wan ti cin, nan to tomawak ci cin
-ye'wan tin, toma:wa k e
-ye'wan tin, toma:wa k e
-ne'wa, ni wa:hki
-te'wa, ti wa:hko cin
+ne'wa , ni kwohtik
+te'wa , ti kwohtik
+ye'wa ci , ti kwohitk ci
+ye'wa , kwohitk
+te'wan tin , ti kwohtik e
+name'wan tin , nan kwohtik e
+ye'wan tin , kwohtik e
+ne'wa , ni tepi to
+te'wa , te tepi to
+te'wa ci , ti tepi to ci
+ye'wa , tepi to
+ye'wa , tepi to
+te'wan tin , ti tepi to ton
+name'wan tin , nan tepi to ton
+name'wan tin cin , nan tepi ton ci ci
+ye'wan tin , tepi to ton
+ye'wan tin , tepi to ton
+ne'wa , ni toma:wa k
+te'wa , ti toma:wa k
+te'wa ci , ti toma:wa k
+ye'wa , toma:wa k
+ye'wa , toma:wa k
+te'wan tin , ti toma:wa k e
+name'wan tin , nan toma:wa ke e
+name'wan ti cin , nan to tomawak ci cin
+ye'wan tin , toma:wa k e
+ye'wan tin , toma:wa k e
+ne'wa , ni wa:hki
+te'wa , ti wa:hko cin
 ye'wan te ti wa wa:hki me
 ye'wan te ti wa wa:hki me
 te'wan te ti wa:hki me
-name'wan te, nan wa wahki me
-name'wan ti cin, nan wa wa:hki ci ci
-ye'wan te, wa wahki me
-ye'wan te, wa wahki me
-no kal, weyi
-mo kal, weyi
-mo kai ci, weyi
-i kal, weyi
-to kal, weyi
-na'mo kal, weyi
-na'mo kal ci, weyi
-in kal, weyi
+name'wan te , nan wa wahki me
+name'wan ti cin , nan wa wa:hki ci ci
+ye'wan te , wa wahki me
+ye'wan te , wa wahki me
+no kal , weyi
+mo kal , weyi
+mo kai ci , weyi
+i kal , weyi
+to kal , weyi
+na'mo kal , weyi
+na'mo kal ci , weyi
+in kal , weyi
 chilcho tl chichiltik
 in chilcho tl yi yo chichili wi 'ke
 in chilcho tl aya'mo chichili wi
-inon kwawi tl, weyi
+inon kwawi tl , weyi
 inon kwawi tl yaw mo skalti weyi
 inon kwowi tl kwohtik o katka
 inon kwowi tl o mo skalti weyi
@@ -70,20 +70,20 @@ ini xompilelo tlamati ke mo xompilelo
 ini xompilelo a'moamati mo xompilelo
 inin xompililoh tl a'mo tla tlamanti ke
 kenin tlamati inon kwe tli
-inon kew tl, ista:k wan tliltik
+inon kew tl , ista:k wan tliltik
 i mo kawayo tlamati ista:k o tliltik'
-i no kawayo, a'mo tliltik ni a'mo ista:k tlamati ista:k ayo
+i no kawayo , a'mo tliltik ni a'mo ista:k tlamati ista:k ayo
 tlen welik in tlakwal e
-in tlakwale, totonki
-in tlaka le, ictik
+in tlakwale , totonki
+in tlaka le , ictik
 in a:tl molwe ictik
-in a: tl, tlawel ictik
+in a: tl , tlawel ictik
 inon kome tl sokiyo
-inon kome tl, a'mo sokiyo
+inon kome tl , a'mo sokiyo
 inon kome tl a'mo chipawak
 inon kome tl a'mo chipawak
-in alte:pe tl, a'mo wehka de nika
-in alte:pe tl, wehka de nika
+in alte:pe tl , a'mo wehka de nika
+in alte:pe tl , wehka de nika
 wehka n altepe: tl ?
 in xwan ompa ka axa in pachuka
 kanin ka in xwan axa ?
@@ -92,7 +92,7 @@ ompa ka pachuka in xawan ?
 yalwa ompa okatka in pachuka in xwan ?
 kanin okatka i yalwa in xwan
 kanin ka mo tata
-ompa ka mo tata itlan kal e?
+ompa ka mo tata itlan kal e ?
 a'mo ompa ka mo tata itlan kal e
 i no tata ompa ka itlan kal e
 i no tata a'mo ompa yelowaki iean kal e
@@ -133,7 +133,7 @@ ti k pia se chichi
 ye'wa pia se chichi
 ye'wa kipiase chichi
 ti pia 'ke se chichi
-name'wan te nan ki pia 'ke  se chichi
+name'wan te nan ki pia 'ke se chichi
 ye'wan te ki pia 'ke se chichi
 ni kim pia ome chichi me
 ti kim pia ome chichi me
@@ -165,8 +165,8 @@ tiex in no cha ompa ka se mechete a'mo no waxka
 ini kamixa o tlapalchuwa k
 ini chichi ki pia tliltik wan ista:k
 ini tlakwal e ki pia ista tl
-in tlakwal i, a'mo ista yo
-in tlakwal i, ista tl chichik
+in tlakwal i , a'mo ista yo
+in tlakwal i , ista tl chichik
 in tlakwal e de sopa ki pa chile
 in kome tl ki pia a: tl
 in kome tl a'mon ki pia a: tl
@@ -197,16 +197,16 @@ itech in kome tl ompa ka n a: tl
 itech in kome tl a'mo tlen ki pia a: tl
 ompa ka ye tl itech in kome tl ?
 a'mo ka ye tl itech in kome tl ?
-ke:me, ompa ka
+ke:me , ompa ka
 a'mo a'mo ompa ka
-a'mo, a'mo tlen ki pia
+a'mo , a'mo tlen ki pia
 itech in kwautla tl a'mo ka te masa: me
 itech i no cha ka tlaka me
 itech i no cha tlaka tentok
 itech i no cha a'mo ka tlaka me
 itech i no cha a'mo tlaka tentok
 itech inon kal e a'mo katka tlaka me
-nikan ka nawi 
+nikan ka nawi
 nikan ka se tlaxkal i
 nika onkan ka n a: tl
 nikan a'mo ka n a: tl
@@ -214,46 +214,46 @@ ompa tentok e kwaw tli
 ompa ka se koko lis tl tech in altepec tl
 itech no altepec w ompa ka n tiankis tl
 itech inon altepe tl ka te weyi kal te
-in kwixi, toto: tl
-inon toto: tl, kwixi
+in kwixi , toto: tl
+inon toto: tl , kwixi
 inon toto: tl tlen i toka
 in xwan tla mach tia ni
 in xwan a'mo tla mach tia ni
-in xwan, ye'wan tlen tla mach tia ni
-in xwan, a'mo tla mach tia ni
+in xwan , ye'wan tlen tla mach tia ni
+in xwan , a'mo tla mach tia ni
 aken in tla mach tia ni
 aki ye'wan tla mach tia ni
 in xwan no kone w ne'wa
-in xwan, no kone w
-in xwan, tlenih kisa
-in xwan tla mach tia ni?
-ne'wa, n i kone w in don manuel
-ne'wa, a'mo n i tone w in don manuel
+in xwan , no kone w
+in xwan , tlenih kisa
+in xwan tla mach tia ni ?
+ne'wa , n i kone w in don manuel
+ne'wa , a'mo n i tone w in don manuel
 in xwan tlamatke
 in xwan o mo kewp tlamatke
-inon kanasta, no waxka
+inon kanasta , no waxka
 inon kanasta mo waxka
 inon kanasta i waxka
 inon kanasta i waxka
 inon kanasta to waxka
-inon kanasta, namo waxka
-inon kanasta, in waxka
-inon kanasta, a'mo no waxka
+inon kanasta , namo waxka
+inon kanasta , in waxka
+inon kanasta , a'mo no waxka
 inon kanasta a'mo mo waxka
 inon kanasta a'mo i waxka
 inon kanasta a'mo i waxka
 inon kanasta a'mo to waxka
-inon kanasta, a'mo namo waxka
-inon kanasta, a'mo in waxka
-in kanasta no waxka, ye inon
-no kanasta, a'mo ye'wa
+inon kanasta , a'mo namo waxka
+inon kanasta , a'mo in waxka
+in kanasta no waxka , ye inon
+no kanasta , a'mo ye'wa
 aki i waxka inon kanasta
-mo waska, inon kanasta ?
-inon janasta, ye mo waxka ?
+mo waska , inon kanasta ?
+inon janasta , ye mo waxka ?
 inin ye'wa wey o' tli
 in xwan de nikan akaxochitla
-de kani wic in xwan?
-de kani, te'watl
+de kani wic in xwan ?
+de kani , te'watl
 akin de akaxichitla
 in xwan se tlaka tl tlamelah lia
 in xwawi de presidente
@@ -261,11 +261,11 @@ in xwan tlenik kisa s
 in xwan okatka in se xiwitl de presidente
 keman okatka de presidente in xwan
 in xwan tlen o ki chiw yi se tsiwi tl ?
-xwan, tlaka tl
-maría, siwa :tl
-ne'wa, ni tlaka tl
+xwan , tlaka tl
+maría , siwa :tl
+ne'wa , ni tlaka tl
 ne'wa ni siwa: tl
-tlen, ini tlakwal e
+tlen , ini tlakwal e
 ni naja tl de ayo tochi
 ne'wa kachi ne telpoch tli
 a'mo kachi ni telpoch tl
@@ -273,11 +273,11 @@ in tlaka tl yewa tika i toka xwan
 in xwan non yewa tika
 ye'wan xwan yewa tika
 akaxochitla weyi n altepe tl
-edubixes, i toka de siwa tl
+edubixes , i toka de siwa tl
 n tlaka tl tlen o kis ni k ixmati
 in tlen o kis ni k ichmati
-tlen, inon
-ye, n chichi
+tlen , inon
+ye , n chichi
 asta yankwik xiwi tl i no telpoka to yi weyi tla:ka tl ye s
 n xwana tlamati te:me n maria
 ino tetlpoka kone tl tlamati ke:me in i tata
@@ -320,7 +320,7 @@ in telpoka to ki neki kochi s
 in telpoka to oksepa o k asi k in koch is tle
 in telpoka to a'mo yeh koch yuwak
 in telpoka to saniman o kasi k koch is tle itech in kamion
-i michi o mik, maixkoman tika pane de n a: tl
+i michi o mik , maixkoman tika pane de n a: tl
 in kwawi tl maixkoman itech in a: tl
 inon siwa tl nech tla tlanilia semian in tlaxkal i
 ye'wa mic tla tl anilia semian in tlaxkal i
@@ -379,7 +379,7 @@ ne'wa a'mo tle ni k mati
 yi k mati ti malti s
 xwan ki mati solamente de we'yi tla'tol i
 ti k mati ni tlato s ika we'yi tla'tol i
-ni k mati ni tlato s ika  we'yi tla'tol i
+ni k mati ni tlato s ika we'yi tla'tol i
 a'mo ni k mati ni malti s
 kema o ti k mat ne'wa o n asiko
 keni o t mat ne'wa o n asiko
@@ -467,7 +467,7 @@ x paweci x teki ino awaka tl
 x nex palewi ki
 x nech palewi ki
 no pil wa o mo kaw ke ki kwidarwa 'ke n kal i
-x temo, x pe'pena
+x temo , x pe'pena
 o kis itlan kal i o nech tlapalo: to
 yi n iaw in tiankis ko
 yi mero n ia ya in tiankis ko pero a'mo n ia o ni mo kaw no cha
@@ -484,7 +484,7 @@ ni tekih tika desde yalwa
 inin wacinko o ni tekit molwe
 segido ni tekiti de tiotlak
 mostla ni tekiti s
-ti tekiti s axa?
+ti tekiti s axa ?
 ti tekiti s mostla
 n iaw ni tekiti s okse buelta
 in xwan yi tekih tika
@@ -570,6 +570,14 @@ o wala itech ini kawayo
 o kis iwa n i xompilelo
 o kis a'mo kwika n i sompilelo
 tekiti isihka
+FALTA
+FALTA
+FALTA
+FALTA
+FALTA
+FALTA
+FALTA
+FALTA
 x kaxani mo ahkol molwe yemanke
 x ne' nemi itech in o' tli derecho
 xi mo tlali kwal ci xi mo melawa
@@ -765,8 +773,8 @@ in xwan kochi s tlen oras ti m axiti kiw
 a'mo xi nech tlacomawa ikwak ni tlakwa' tika
 a'mo xi nech tlapolochiti ikwak ni tlakwa
 in tla ki neki ke ma ya kan x kawa ma ya kan
-in xwan ki to:ka s in chile, ne'wa ni k to:ka s también
-in xwan ki to:ka s in chile, wan ne'wa a'mo
+in xwan ki to:ka s in chile , ne'wa ni k to:ka s también
+in xwan ki to:ka s in chile , wan ne'wa a'mo
 in xwan a'mo ki to:ka s ne'wa keme
 tle ti mo neki itia de ini
 a'mo tle ni k neki de ino
