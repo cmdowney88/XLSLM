@@ -5,6 +5,7 @@ segmentation
 
 Authors:
     C.M. Downey (cmdowney@uw.edu)
+    Shivin Thukral (shivin7@uw.edu)
 """
 import math
 import time
@@ -225,7 +226,7 @@ class SegmentalLanguageModel(nn.Module):
             data: The batch of input sequences
             lengths: The list of the real (unpadded) lengths for each sequence
             max_seg_len: The maximum segment length to be encoded
-            device: torch.device value denoting if model is on CPU or CUDA
+            device: The PyTorch device to which to move the encoder
 
         """
         # Embed the input batch
@@ -267,7 +268,7 @@ class SegmentalLanguageModel(nn.Module):
             data: The batch of input sequences
             embedded_seq: The embeddings of the input sequences
             encoder_output: The output from the context encoder
-            device: torch.device value denoting if model is on CPU or CUDA
+            device: The PyTorch device to which to move the segment scores
             range_by_length: A mapping of segment length to range of positions
                 that can start the corresponding segment.
             chars_to_subword_id: A mapping of character-index tuples to the
@@ -312,8 +313,8 @@ class SegmentalLanguageModel(nn.Module):
             if self.use_lexicon:
                 subword_losses, lexical_proportions, character_proportions = self.lexicon_decoder(
                     all_subword_probs, all_lex_proportions, data,
-                    num_seg_starts, seg_len, batch_size, range_start, range_end, device,
-                    chars_to_subword_id
+                    num_seg_starts, seg_len, batch_size, range_start, range_end,
+                    device, chars_to_subword_id
                 )
 
             # Create a matrix of the 'masked' (original) segments to be fed to
@@ -406,7 +407,7 @@ class SegmentalLanguageModel(nn.Module):
             max_seg_len: The maximum segment length to be encoded
             segment_scores: The probability scores of segments of each length
                 starting at each position and ending with <eoseg>
-            device: torch.device value denoting if model is on CPU or CUDA
+            device: The PyTorch device to which to move the lengths tensor
             length_exponent: The exponent to which to raise each segment length
                 if expected length regularization is being used. Default: 2
             length_penalty_lambda: The lambda used to control the strength of
@@ -496,7 +497,7 @@ class SegmentalLanguageModel(nn.Module):
                 given segment length
             range_end: The starting position of the final segment with the
                 given segment length
-            device: torch.device value denoting if model is on CPU or CUDA
+            device: The PyTorch device to which to move the subword losses
             chars_to_subword_id: A mapping of character-index tuples to the
                 indices of the subword/segment they constitute. Default:
                 ``None``
@@ -610,6 +611,10 @@ class SLMEncoder(nn.Module):
         self.enc_type = enc_type
         self.autoencoder = autoencoder
         self.attention_window = attention_window
+        self.h_init_state = None
+        self.c_init_state = None
+        self.positional_emb_proportion = None
+        self.emb_scale_factor = None
 
         if self.attention_window:
             warnings.warn(
@@ -637,8 +642,9 @@ class SLMEncoder(nn.Module):
             pe = np.zeros((max_seq_length, encoder_dim))
             for pos in range(max_seq_length):
                 for i in range(0, math.ceil(encoder_dim / 2)):
-                    pe[pos,
-                       2 * i] = np.sin(pos / (10000**(2 * i / encoder_dim)))
+                    pe[pos, 2 * i] = np.sin(
+                        pos / (10000**(2 * i / encoder_dim))
+                    )
                     if 2 * i + 1 < encoder_dim:
                         pe[pos, 2 * i + 1] = np.cos(
                             pos / (10000**(2 * i / encoder_dim))
@@ -646,18 +652,14 @@ class SLMEncoder(nn.Module):
             model_dtype = self.input_to_enc_dim.weight.dtype
             pe = torch.tensor(pe, dtype=model_dtype).unsqueeze(1)
             self.register_buffer('pe', pe)
+
             if smart_position:
                 self.positional_emb_proportion = nn.Linear(
                     2 * encoder_dim, 1, bias=False
                 )
                 self.positional_emb_proportion.weight.data.fill_(0.0001)
-                self.emb_scale_factor = None
             else:
-                self.positional_emb_proportion = None
                 self.emb_scale_factor = nn.Parameter(torch.tensor([1.0]))
-
-            self.h_init_state = None
-            self.c_init_state = None
 
             # A transformer-based encoder has the additional option of being run
             # as an autoencoder (i.e. having no positions masked out). This is
@@ -685,9 +687,6 @@ class SLMEncoder(nn.Module):
         # If the encoder is to be lstm-based, initialize the h and c initial
         # states, also set the positional encoding to be None
         elif self.enc_type == 'lstm':
-            self.pos_encoder = None
-            self.positional_emb_proportion = None
-            self.emb_scale_factor = None
             self.h_init_state = nn.Parameter(
                 torch.zeros(num_enc_layers, 1, encoder_dim)
             )
@@ -729,59 +728,108 @@ class SLMEncoder(nn.Module):
         x = self.input_to_enc_dim(x)
 
         if self.enc_type == 'transformer':
-            # Create the padding mask
-            padding_mask = torch.zeros(batch_size, seq_len)
-            for seq in range(batch_size):
-                if lengths[seq] < seq_len:
-                    for pad in range(lengths[seq], seq_len):
-                        padding_mask[seq][pad] = 1
-            padding_mask = padding_mask.bool().to(device)
-
-            # Add the positional encoding to the embedding
-            pos_encoding = self.pe[:seq_len, :]
-            if self.positional_emb_proportion:
-                pos_encoding = pos_encoding.repeat(1, batch_size, 1)
-                concatenated_embedding = torch.cat((x, pos_encoding), dim=2)
-                emb_factor = 1.0 + torch.relu(
-                    self.positional_emb_proportion(concatenated_embedding)
-                )
-                scaled_embedding = emb_factor * x
-                pos_embedded_seq = scaled_embedding + pos_encoding
-            else:
-                pos_embedded_seq = (self.emb_scale_factor * x) + pos_encoding
-
-            # Apply dropout before feeding to the encoder
-            pos_embedded_seq = self.input_dropout(pos_embedded_seq)
-
-            # Run the input through the transformer block
-            if not self.autoencoder:
-                attn_mask = self.encoder.get_mask(
-                    seq_len,
-                    seg_len=max_seg_len,
-                    shape=mask_type,
-                    window=self.attention_window
-                ).to(device)
-                encoder_output = self.encoder(
-                    pos_embedded_seq,
-                    attn_mask=attn_mask,
-                    padding_mask=padding_mask
-                )
-            else:
-                encoder_output = self.encoder(
-                    pos_embedded_seq, src_key_padding_mask=padding_mask
-                )
+            encoder_output = self.encode_transformer(
+                x, lengths, seq_len, batch_size, device, mask_type, max_seg_len
+            )
         elif self.enc_type == 'lstm':
-            # Apply dropout before feeding to the encoder
-            x = self.input_dropout(x)
-            # Expand h and c to match the batch size, and run the input through
-            # the LSTM block
-            h = self.h_init_state.expand(-1, batch_size, -1).contiguous()
-            c = self.c_init_state.expand(-1, batch_size, -1).contiguous()
-            rnn_input = nn.utils.rnn.pack_padded_sequence(x, lengths)
-            encoder_output, _ = self.encoder(rnn_input, (h, c))
-            encoder_output, _ = nn.utils.rnn.pad_packed_sequence(encoder_output)
+            encoder_output = self.encode_lstm(x, lengths, batch_size)
         else:
             raise ValueError(f'Encoder type {self.enc_type} is not valid')
+
+        return encoder_output
+
+    def encode_transformer(
+        self,
+        x: Tensor,
+        lengths: List[int],
+        seq_len: int,
+        batch_size: int,
+        device,
+        mask_type: str = 'cloze',
+        max_seg_len: int = 1
+    ) -> Tensor:
+        """
+        Encode the language modeling context for each position in the input
+        sequences using the transformer encoder
+
+        Args:
+            x: The embedded input batch of sequences passed through a linear
+                layer
+            lengths: The list of the real (unpadded) lengths for each sequence
+            seq_len: The length of the maximum padded input sequence
+            batch_size: The number of input sequences in each batch
+            device: The PyTorch device to which to move the mask
+            mask_type: The type of attention mask to use with a transformer
+                encoder. Default: ``cloze``
+            max_seg_len: The maximum segment length to be encoded. Default: 1
+
+        """
+        # Create the padding mask
+        padding_mask = torch.zeros(batch_size, seq_len)
+        for seq in range(batch_size):
+            if lengths[seq] < seq_len:
+                for pad in range(lengths[seq], seq_len):
+                    padding_mask[seq][pad] = 1
+        padding_mask = padding_mask.bool().to(device)
+
+        # Add the positional encoding to the embedding
+        pos_encoding = self.pe[:seq_len, :]
+        if self.positional_emb_proportion:
+            pos_encoding = pos_encoding.repeat(1, batch_size, 1)
+            concatenated_embedding = torch.cat((x, pos_encoding), dim=2)
+            emb_factor = 1.0 + torch.relu(
+                self.positional_emb_proportion(concatenated_embedding)
+            )
+            scaled_embedding = emb_factor * x
+            pos_embedded_seq = scaled_embedding + pos_encoding
+        else:
+            pos_embedded_seq = (self.emb_scale_factor * x) + pos_encoding
+
+        # Apply dropout before feeding to the encoder
+        pos_embedded_seq = self.input_dropout(pos_embedded_seq)
+
+        # Run the input through the transformer block
+        if not self.autoencoder:
+            attn_mask = self.encoder.get_mask(
+                seq_len,
+                seg_len=max_seg_len,
+                shape=mask_type,
+                window=self.attention_window
+            ).to(device)
+            encoder_output = self.encoder(
+                pos_embedded_seq,
+                attn_mask=attn_mask,
+                padding_mask=padding_mask
+            )
+        else:
+            encoder_output = self.encoder(
+                pos_embedded_seq, src_key_padding_mask=padding_mask
+            )
+
+        return encoder_output
+
+    def encode_lstm(
+        self, x: Tensor, lengths: List[int], batch_size: int
+    ) -> Tensor:
+        """
+        Encode the language modeling context for each position in the input
+        sequences using the LSTM encoder
+
+        Args:
+            x: The embedded input batch of sequences passed through a linear
+                layer
+            lengths: The list of the real (unpadded) lengths for each sequence
+            batch_size: The number of input sequences in each batch
+        """
+        # Apply dropout before feeding to the encoder
+        x = self.input_dropout(x)
+        # Expand h and c to match the batch size, and run the input through
+        # the LSTM block
+        h = self.h_init_state.expand(-1, batch_size, -1).contiguous()
+        c = self.c_init_state.expand(-1, batch_size, -1).contiguous()
+        rnn_input = nn.utils.rnn.pack_padded_sequence(x, lengths)
+        encoder_output, _ = self.encoder(rnn_input, (h, c))
+        encoder_output, _ = nn.utils.rnn.pad_packed_sequence(encoder_output)
 
         return encoder_output
 
