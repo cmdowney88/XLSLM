@@ -22,7 +22,7 @@ from torch.nn.modules.transformer import (
 )
 
 from .lattice import AcyclicLattice
-from .segmental_transformer import (SegmentalTransformerEncoder)
+from .segmental_transformer import SegmentalTransformerEncoder
 
 
 class SegmentalLanguageModel(nn.Module):

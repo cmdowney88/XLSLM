@@ -10,7 +10,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 from torch import Tensor
-from torch.nn.modules.transformer import (TransformerEncoderLayer, _get_clones)
+from torch.nn.modules.transformer import TransformerEncoderLayer, _get_clones
 
 
 class SegmentalTransformerEncoder(nn.Module):

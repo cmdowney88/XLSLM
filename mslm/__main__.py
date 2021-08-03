@@ -32,7 +32,7 @@ from sklearn.metrics import precision_recall_fscore_support as fscore
 from torch.utils.data import DataLoader, RandomSampler
 
 from .mslm_config import MSLMConfig
-from .segmental_lm import SegmentalLanguageModel
+from .slm import SegmentalLanguageModel
 
 # ------------------------------------------------------------------------------
 # Auxiliary Function Definitions
