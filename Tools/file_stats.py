@@ -33,7 +33,7 @@ def get_stats(filename: str) -> Dict[str, str]:
     stats_dict = {'Filename': filename}
 
     # open file and get lines
-    lines = [line.strip() for line in open(filename, 'r')]
+    lines = [line.strip().lower() for line in open(filename, 'r')]
     lines[:] = [x for x in lines if x]
 
     # find how many lines are in file
@@ -88,7 +88,7 @@ def get_stats(filename: str) -> Dict[str, str]:
     for token in total_tokens_list:
         total += len(token)
         counter += 1
-    avg_token_length = total / counter
+    avg_token_length = round(total / counter, 2)
     stats_dict['Average token length of all tokens in file'] = str(
         avg_token_length
     )
@@ -98,7 +98,7 @@ def get_stats(filename: str) -> Dict[str, str]:
     for token in unique_tokens_list:
         total += len(token)
         counter += 1
-    avg_unique_token_length = total / counter
+    avg_unique_token_length = round(total / counter, 2)
     stats_dict['Average token length of all unique tokens in file'] = str(
         avg_unique_token_length
     )
@@ -164,9 +164,7 @@ def main():
     # get stats for each file and write stats to file
     for filename in list_of_files:
         stats_dict = get_stats(filename)
-        stats_file = filename[:-4]
-        stats_file_extension = filename[-3:]
-        write_to_file(stats_file + '_stats.' + stats_file_extension, stats_dict)
+        write_to_file(f"{filename}.stats", stats_dict)
         list_of_stats.append(stats_dict)
 
     # write to combined stats file
