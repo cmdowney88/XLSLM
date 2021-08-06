@@ -1,53 +1,51 @@
 """
 Script to remove any duplicate lines between AmericasNLP files and KannEtAl2018
 files for the same language. If a line exists in both the AmericasNLP data and
-KannEtAl2018 data, it is removed from KannEtAl2018 and stays in AmericasNLP. The
+KannEtAl2018 data, it is removed from AmericasNLP and stays in KannEtAl. The
 script is only meant for one language at a time
 
 Expected command line args: <program_name> <AmericasNLP_train_file> \
     <AmericasNLP_dev_file> <KannEtAl2018_file> 
 """
+import os
 import re
 import sys
-from typing import List
+from typing import List, Tuple
 
 
-def remove(anlp_lines: List[str], kea_lines: List[str]) -> List[str]:
+def remove(
+    anlp_train_lines: List[str], anlp_dev_lines: List[str], kea_lines: List[str]
+) -> Tuple[List[str], List[str]]:
     """
     Remove duplicate lines between AmericasNLP data and Kann et al. 2018 data
-    from the Kann et al. 2018 data. Returns the remaining lines for the Kann et
-    al. 2018 data
+    from the AmericasNLP data. Returns the remaining lines for the AmericasNLP
+    data
     
     Args:
-        anlp_lines: A list of the lines in the AmericasNLP files
+        anlp_train_lines: A list of the lines in the AmericasNLP train file
+        anlp_dev_lines: A list of the lines in the AmericasNLP dev file
         kea_lines: A list of the lines in the Kann et al. file.
     Returns:
-        A list of strings, which are the remaining lines from the Kann et al.
-        file after removing duplicates
+        A pair of lists of strings, which are the remaining lines from the
+        AmericasNLP training and dev files after removing duplicates
     """
-    # to store anlp lines with no whitespace or punctuation
-    stripped_anlp_lines = []
-
-    # remove whitespace and punctuation for anlp lines for comparison with kae
+    # remove whitespace and punctuation for kea lines for comparison with anlp
     # lines
-    for line in anlp_lines:
-        stripped_line = no_whitespace_or_punct(line)
-        stripped_anlp_lines.append(stripped_line)
+    stripped_kea_lines = [no_whitespace_or_punct(line) for line in kea_lines]
 
-    # to store the final lines from Kann et al. 2018 remaining after removing
-    # any duplicates
-    final_kea_lines = []
+    # remove whitespace and punctuation for the AmericasNLP lines and compare
+    # with the lines from Kann et al. with whitespace and punctuation removed.
+    # Keep in AmericasNLP only if not a duplicate from Kann et al.
+    final_anlp_train_lines = [
+        line for line in anlp_train_lines
+        if no_whitespace_or_punct(line) not in stripped_kea_lines
+    ]
+    final_anlp_dev_lines = [
+        line for line in anlp_dev_lines
+        if no_whitespace_or_punct(line) not in stripped_kea_lines
+    ]
 
-    # remove whitespace and punctuation for Kann et al. lines and compare with
-    # the lines from AmericasNLP with whitespace and punctuation removed. If not
-    # a duplicate line, add Kann et al. line to list of final lines
-    for line in kea_lines:
-        orig_line = line
-        stripped_line = no_whitespace_or_punct(line)
-        if stripped_line not in stripped_anlp_lines:
-            final_kea_lines.append(orig_line)
-
-    return final_kea_lines
+    return final_anlp_train_lines, final_anlp_dev_lines
 
 
 def no_whitespace_or_punct(line: str) -> str:
@@ -88,7 +86,7 @@ def write_to_file(filename: str, prepared_data: List[str]):
 def main():
     """
     Main function of program. Gets files from command lines. Removes duplicate
-    lines between AmericasNLP and Kann et al. 2018 from Kann et al. 2018 with
+    lines between AmericasNLP and Kann et al. 2018 from AmericasNLP with
     remove() and writes the remaining lines to a file with write_to_file()
     """
     # Get file paths from command line
@@ -103,16 +101,18 @@ def main():
     anlp_dev_lines = [line.strip() for line in open(anlp_dev_file, 'r')]
     anlp_dev_lines[:] = [x for x in anlp_dev_lines if x]
 
-    # combine lines from both AmericasNLP files into one list
-    anlp_lines = anlp_train_lines + anlp_dev_lines
-
     # get lines from Kann et al. 2018 file
     kea_lines = [line.strip() for line in open(kea_file, 'r')]
     kea_lines[:] = [x for x in kea_lines if x]
 
     # Remove duplicate lines and write remaining lines to file
-    final_kea_lines = remove(anlp_lines, kea_lines)
-    write_to_file(kea_file[:-4] + '_removed' + kea_file[-4:], final_kea_lines)
+    final_anlp_train_lines, final_anlp_dev_lines = remove(
+        anlp_train_lines, anlp_dev_lines, kea_lines
+    )
+    base, extension = os.path.splitext(anlp_train_file)
+    write_to_file(base + '_removed' + extension, final_anlp_train_lines)
+    base, extension = os.path.splitext(anlp_dev_file)
+    write_to_file(base + '_removed' + extension, final_anlp_dev_lines)
 
 
 if __name__ == "__main__":
