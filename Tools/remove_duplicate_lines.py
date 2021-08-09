@@ -3,6 +3,8 @@ Script to remove any duplicate lines between AmericasNLP files and KannEtAl2018
 files for the same language. If a line exists in both the AmericasNLP data and
 KannEtAl2018 data, it is removed from AmericasNLP and stays in KannEtAl. The
 script is only meant for one language at a time
+Run this script after prepare_kann_et_al.py and before prepare_americas_nlp.py
+to remove duplicate lines before the creation of dev.anlp and train.anlp
 
 Expected command line args: <program_name> <AmericasNLP_train_file> \
     <AmericasNLP_dev_file> <KannEtAl2018_file> 
