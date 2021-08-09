@@ -1,220 +1,220 @@
 Filename: dev.anlp
 Number of lines: 9122
 Total number of tokens: 79901
-Number of unique tokens: 28930
+Number of unique tokens: 27597
 Total number of characters in file: 485179
-Total number of characters in unique tokens: 242552
+Total number of characters in unique tokens: 233929
 Total number of unique characters: 105
-Average token length of all tokens in file: 6.072251911740779
-Average token length of all unique tokens in file: 8.384099550639474
+Average token length of all tokens in file: 6.07
+Average token length of all unique tokens in file: 8.48
 
 Filename: dev.aym
 Number of lines: 996
 Total number of tokens: 7080
-Number of unique tokens: 4081
+Number of unique tokens: 3908
 Total number of characters in file: 53852
-Total number of characters in unique tokens: 37174
+Total number of characters in unique tokens: 35964
 Total number of unique characters: 64
-Average token length of all tokens in file: 7.606214689265537
-Average token length of all unique tokens in file: 9.10904190149473
+Average token length of all tokens in file: 7.61
+Average token length of all unique tokens in file: 9.2
 
 Filename: dev.bzd
 Number of lines: 996
 Total number of tokens: 12974
-Number of unique tokens: 2649
+Number of unique tokens: 2502
 Total number of characters in file: 50573
-Total number of characters in unique tokens: 15906
+Total number of characters in unique tokens: 15175
 Total number of unique characters: 73
-Average token length of all tokens in file: 3.8980268228765222
-Average token length of all unique tokens in file: 6.004530011325028
+Average token length of all tokens in file: 3.9
+Average token length of all unique tokens in file: 6.07
 
 Filename: dev.cni
 Number of lines: 883
 Total number of tokens: 6070
-Number of unique tokens: 3225
+Number of unique tokens: 3100
 Total number of characters in file: 53401
-Total number of characters in unique tokens: 34069
+Total number of characters in unique tokens: 33100
 Total number of unique characters: 63
-Average token length of all tokens in file: 8.797528830313015
-Average token length of all unique tokens in file: 10.564031007751938
+Average token length of all tokens in file: 8.8
+Average token length of all unique tokens in file: 10.68
 
 Filename: dev.gn
 Number of lines: 995
 Total number of tokens: 7191
-Number of unique tokens: 3367
+Number of unique tokens: 3181
 Total number of characters in file: 48516
-Total number of characters in unique tokens: 28193
+Total number of characters in unique tokens: 26912
 Total number of unique characters: 70
-Average token length of all tokens in file: 6.746766791823112
-Average token length of all unique tokens in file: 8.373329373329373
+Average token length of all tokens in file: 6.75
+Average token length of all unique tokens in file: 8.46
 
 Filename: dev.hch
 Number of lines: 994
 Total number of tokens: 10296
-Number of unique tokens: 3913
+Number of unique tokens: 3895
 Total number of characters in file: 56142
-Total number of characters in unique tokens: 25978
+Total number of characters in unique tokens: 25878
 Total number of unique characters: 62
-Average token length of all tokens in file: 5.4527972027972025
-Average token length of all unique tokens in file: 6.638895987733197
+Average token length of all tokens in file: 5.45
+Average token length of all unique tokens in file: 6.64
 
 Filename: dev.nah
 Number of lines: 672
 Total number of tokens: 4300
-Number of unique tokens: 1920
+Number of unique tokens: 1839
 Total number of characters in file: 31338
-Total number of characters in unique tokens: 17775
+Total number of characters in unique tokens: 17219
 Total number of unique characters: 56
-Average token length of all tokens in file: 7.287906976744186
-Average token length of all unique tokens in file: 9.2578125
+Average token length of all tokens in file: 7.29
+Average token length of all unique tokens in file: 9.36
 
 Filename: dev.oto
 Number of lines: 599
 Total number of tokens: 5069
-Number of unique tokens: 1660
+Number of unique tokens: 1595
 Total number of characters in file: 22712
-Total number of characters in unique tokens: 9979
+Total number of characters in unique tokens: 9697
 Total number of unique characters: 69
-Average token length of all tokens in file: 4.480568159400276
-Average token length of all unique tokens in file: 6.0114457831325305
+Average token length of all tokens in file: 4.48
+Average token length of all unique tokens in file: 6.08
 
 Filename: dev.quy
 Number of lines: 996
 Total number of tokens: 7406
-Number of unique tokens: 4028
+Number of unique tokens: 3826
 Total number of characters in file: 58005
-Total number of characters in unique tokens: 37570
+Total number of characters in unique tokens: 36161
 Total number of unique characters: 62
-Average token length of all tokens in file: 7.832163110991089
-Average token length of all unique tokens in file: 9.32720953326713
+Average token length of all tokens in file: 7.83
+Average token length of all unique tokens in file: 9.45
 
 Filename: dev.shp
 Number of lines: 996
 Total number of tokens: 9138
-Number of unique tokens: 3447
+Number of unique tokens: 3296
 Total number of characters in file: 54996
-Total number of characters in unique tokens: 27428
+Total number of characters in unique tokens: 26498
 Total number of unique characters: 65
-Average token length of all tokens in file: 6.0183847669074195
-Average token length of all unique tokens in file: 7.957064113722077
+Average token length of all tokens in file: 6.02
+Average token length of all unique tokens in file: 8.04
 
 Filename: dev.tar
 Number of lines: 995
 Total number of tokens: 10377
-Number of unique tokens: 3142
+Number of unique tokens: 2964
 Total number of characters in file: 55644
-Total number of characters in unique tokens: 21948
+Total number of characters in unique tokens: 20931
 Total number of unique characters: 48
-Average token length of all tokens in file: 5.362243422954611
-Average token length of all unique tokens in file: 6.985359643539147
+Average token length of all tokens in file: 5.36
+Average token length of all unique tokens in file: 7.06
 
 Filename: train.anlp
-Number of lines: 225958
-Total number of tokens: 2376865
-Number of unique tokens: 369746
-Total number of characters in file: 16787156
-Total number of characters in unique tokens: 3881526
+Number of lines: 225940
+Total number of tokens: 2376833
+Number of unique tokens: 347881
+Total number of characters in file: 16786932
+Total number of characters in unique tokens: 3687741
 Total number of unique characters: 253
-Average token length of all tokens in file: 7.062730108777739
-Average token length of all unique tokens in file: 10.49781742060766
+Average token length of all tokens in file: 7.06
+Average token length of all unique tokens in file: 10.6
 
 Filename: train.aym
 Number of lines: 6525
 Total number of tokens: 97210
-Number of unique tokens: 35783
+Number of unique tokens: 33879
 Total number of characters in file: 630972
-Total number of characters in unique tokens: 321998
+Total number of characters in unique tokens: 308321
 Total number of unique characters: 157
-Average token length of all tokens in file: 6.490813702294003
-Average token length of all unique tokens in file: 8.998630634658916
+Average token length of all tokens in file: 6.49
+Average token length of all unique tokens in file: 9.1
 
 Filename: train.bzd
 Number of lines: 7508
 Total number of tokens: 41141
-Number of unique tokens: 8365
+Number of unique tokens: 7858
 Total number of characters in file: 167531
-Total number of characters in unique tokens: 51050
+Total number of characters in unique tokens: 48536
 Total number of unique characters: 65
-Average token length of all tokens in file: 4.0721178386524395
-Average token length of all unique tokens in file: 6.102809324566647
+Average token length of all tokens in file: 4.07
+Average token length of all unique tokens in file: 6.18
 
 Filename: train.cni
 Number of lines: 3883
 Total number of tokens: 26096
-Number of unique tokens: 13349
+Number of unique tokens: 12490
 Total number of characters in file: 232494
-Total number of characters in unique tokens: 139599
+Total number of characters in unique tokens: 132316
 Total number of unique characters: 65
-Average token length of all tokens in file: 8.909181483752299
-Average token length of all unique tokens in file: 10.457637276200465
+Average token length of all tokens in file: 8.91
+Average token length of all unique tokens in file: 10.59
 
 Filename: train.gn
 Number of lines: 26009
 Total number of tokens: 405548
-Number of unique tokens: 48921
+Number of unique tokens: 44787
 Total number of characters in file: 2719226
-Total number of characters in unique tokens: 428722
+Total number of characters in unique tokens: 396200
 Total number of unique characters: 120
-Average token length of all tokens in file: 6.7050657382110135
-Average token length of all unique tokens in file: 8.763557572412665
+Average token length of all tokens in file: 6.71
+Average token length of all unique tokens in file: 8.85
 
 Filename: train.hch
-Number of lines: 8966
-Total number of tokens: 48896
-Number of unique tokens: 17386
-Total number of characters in file: 332353
-Total number of characters in unique tokens: 152197
+Number of lines: 8948
+Total number of tokens: 48864
+Number of unique tokens: 17357
+Total number of characters in file: 332129
+Total number of characters in unique tokens: 151994
 Total number of unique characters: 67
-Average token length of all tokens in file: 6.797140870418848
-Average token length of all unique tokens in file: 8.753997469228114
+Average token length of all tokens in file: 6.8
+Average token length of all unique tokens in file: 8.76
 
 Filename: train.nah
 Number of lines: 16063
 Total number of tokens: 351709
-Number of unique tokens: 56361
+Number of unique tokens: 53743
 Total number of characters in file: 1984693
-Total number of characters in unique tokens: 587839
+Total number of characters in unique tokens: 567184
 Total number of unique characters: 102
-Average token length of all tokens in file: 5.642997478028711
-Average token length of all unique tokens in file: 10.429889462571637
+Average token length of all tokens in file: 5.64
+Average token length of all unique tokens in file: 10.55
 
 Filename: train.oto
 Number of lines: 4889
 Total number of tokens: 72280
-Number of unique tokens: 9130
+Number of unique tokens: 8664
 Total number of characters in file: 275696
-Total number of characters in unique tokens: 63186
+Total number of characters in unique tokens: 60676
 Total number of unique characters: 90
-Average token length of all tokens in file: 3.8142778085224127
-Average token length of all unique tokens in file: 6.9207009857612265
+Average token length of all tokens in file: 3.81
+Average token length of all unique tokens in file: 7.0
 
 Filename: train.quy
 Number of lines: 122803
 Total number of tokens: 1167390
-Number of unique tokens: 156071
+Number of unique tokens: 146080
 Total number of characters in file: 9647783
-Total number of characters in unique tokens: 1923002
+Total number of characters in unique tokens: 1817539
 Total number of unique characters: 115
-Average token length of all tokens in file: 8.264404355014177
-Average token length of all unique tokens in file: 12.32132811348681
+Average token length of all tokens in file: 8.26
+Average token length of all unique tokens in file: 12.44
 
 Filename: train.shp
 Number of lines: 14592
 Total number of tokens: 62850
-Number of unique tokens: 18880
+Number of unique tokens: 17642
 Total number of characters in file: 397510
-Total number of characters in unique tokens: 156553
+Total number of characters in unique tokens: 148344
 Total number of unique characters: 56
-Average token length of all tokens in file: 6.324741447891806
-Average token length of all unique tokens in file: 8.292002118644067
+Average token length of all tokens in file: 6.32
+Average token length of all unique tokens in file: 8.41
 
 Filename: train.tar
 Number of lines: 14720
 Total number of tokens: 103745
-Number of unique tokens: 15796
+Number of unique tokens: 15691
 Total number of characters in file: 398898
-Total number of characters in unique tokens: 113959
+Total number of characters in unique tokens: 113433
 Total number of unique characters: 74
-Average token length of all tokens in file: 3.8449853004964094
-Average token length of all unique tokens in file: 7.214421372499367
+Average token length of all tokens in file: 3.84
+Average token length of all unique tokens in file: 7.23
 

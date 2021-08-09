@@ -1,60 +1,60 @@
 Filename: segmented_dev.quc
 Number of lines: 25
 Total number of tokens: 231
-Number of unique tokens: 110
+Number of unique tokens: 105
 Total number of characters in file: 583
-Total number of characters in unique tokens: 380
+Total number of characters in unique tokens: 369
 Total number of unique characters: 27
-Average token length of all tokens in file: 2.5238095238095237
-Average token length of all unique tokens in file: 3.4545454545454546
+Average token length of all tokens in file: 2.52
+Average token length of all unique tokens in file: 3.51
 
 Filename: segmented_test.quc
 Number of lines: 142
 Total number of tokens: 2229
-Number of unique tokens: 471
+Number of unique tokens: 426
 Total number of characters in file: 6589
-Total number of characters in unique tokens: 2238
+Total number of characters in unique tokens: 2057
 Total number of unique characters: 51
-Average token length of all tokens in file: 2.956034096007178
-Average token length of all unique tokens in file: 4.751592356687898
+Average token length of all tokens in file: 2.96
+Average token length of all unique tokens in file: 4.83
 
 Filename: segmented_train.quc
 Number of lines: 1472
 Total number of tokens: 14679
-Number of unique tokens: 1528
+Number of unique tokens: 1381
 Total number of characters in file: 38356
-Total number of characters in unique tokens: 7889
+Total number of characters in unique tokens: 7272
 Total number of unique characters: 57
-Average token length of all tokens in file: 2.612984535731317
-Average token length of all unique tokens in file: 5.162958115183246
+Average token length of all tokens in file: 2.61
+Average token length of all unique tokens in file: 5.27
 
 Filename: unsegmented_dev.quc
 Number of lines: 25
 Total number of tokens: 163
-Number of unique tokens: 100
+Number of unique tokens: 97
 Total number of characters in file: 583
-Total number of characters in unique tokens: 454
+Total number of characters in unique tokens: 446
 Total number of unique characters: 27
-Average token length of all tokens in file: 3.576687116564417
-Average token length of all unique tokens in file: 4.54
+Average token length of all tokens in file: 3.58
+Average token length of all unique tokens in file: 4.6
 
 Filename: unsegmented_test.quc
 Number of lines: 142
 Total number of tokens: 1700
-Number of unique tokens: 539
+Number of unique tokens: 498
 Total number of characters in file: 6589
-Total number of characters in unique tokens: 3096
+Total number of characters in unique tokens: 2908
 Total number of unique characters: 51
-Average token length of all tokens in file: 3.8758823529411766
-Average token length of all unique tokens in file: 5.743970315398887
+Average token length of all tokens in file: 3.88
+Average token length of all unique tokens in file: 5.84
 
 Filename: unsegmented_train.quc
 Number of lines: 1472
 Total number of tokens: 10010
-Number of unique tokens: 2433
+Number of unique tokens: 2200
 Total number of characters in file: 38356
-Total number of characters in unique tokens: 15391
+Total number of characters in unique tokens: 14165
 Total number of unique characters: 57
-Average token length of all tokens in file: 3.8317682317682316
-Average token length of all unique tokens in file: 6.325935059597205
+Average token length of all tokens in file: 3.83
+Average token length of all unique tokens in file: 6.44
 
