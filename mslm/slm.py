@@ -10,7 +10,7 @@ Authors:
 import math
 import time
 import warnings
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import torch
 import numpy as np
@@ -22,7 +22,7 @@ from torch.nn.modules.transformer import (
 )
 
 from .lattice import AcyclicLattice
-from .segmental_transformer import SegmentalTransformerEncoder
+from .segmental_transformer import SegmentalTransformerEncoder, computePositionalEncoding
 
 
 class SegmentalLanguageModel(nn.Module):
@@ -647,18 +647,9 @@ class SLMEncoder(nn.Module):
             # Register a static sinusoidal positional encoding, as well as an
             # optional feedforward layer to determine the relative strength of
             # the original and positional embeddings
-            pe = np.zeros((max_seq_length, encoder_dim))
-            for pos in range(max_seq_length):
-                for i in range(0, math.ceil(encoder_dim / 2)):
-                    pe[pos, 2 * i] = np.sin(
-                        pos / (10000**(2 * i / encoder_dim))
-                    )
-                    if 2 * i + 1 < encoder_dim:
-                        pe[pos, 2 * i + 1] = np.cos(
-                            pos / (10000**(2 * i / encoder_dim))
-                        )
-            model_dtype = self.input_to_enc_dim.weight.dtype
-            pe = torch.tensor(pe, dtype=model_dtype).unsqueeze(1)
+            pe = computePositionalEncoding(
+                d_model=encoder_dim, max_len=max_seq_length
+            )
             self.register_buffer('pe', pe)
 
             if smart_position:
