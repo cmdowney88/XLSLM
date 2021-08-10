@@ -311,11 +311,15 @@ class SegmentalLanguageModel(nn.Module):
             # Obtain the subword probability scores and lexical proportions if
             # a lexicon is being used
             if self.use_lexicon:
-                subword_losses, lexical_proportions, character_proportions = self.lexicon_decoder(
+                lexiconDecoderDict = self.lexicon_decoder(
                     all_subword_probs, all_lex_proportions, data,
                     num_seg_starts, seg_len, batch_size, range_start, range_end,
                     device, chars_to_subword_id
                 )
+                subword_losses = lexiconDecoderDict['subword losses']
+                lexical_proportions = lexiconDecoderDict['lexical proportions']
+                character_proportions = lexiconDecoderDict[
+                    'character proportions']
 
             # Create a matrix of the 'masked' (original) segments to be fed to
             # the decoder, as well as the matrix of targets to compare against.
@@ -478,7 +482,7 @@ class SegmentalLanguageModel(nn.Module):
         range_end: int,
         device,
         chars_to_subword_id: dict = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> Dict[str, int]:
         """
         If a lexicon is being used, use the lexicon probabilities to compute the
         scores for the relevant subwords
@@ -558,7 +562,11 @@ class SegmentalLanguageModel(nn.Module):
         # proportion
         character_proportions = 1 - lexical_proportions
 
-        return subword_losses, lexical_proportions, character_proportions
+        return {
+            'subword losses': subword_losses,
+            'lexical proportions': lexical_proportions,
+            'character proportions': character_proportions
+        }
 
 
 class SLMEncoder(nn.Module):
