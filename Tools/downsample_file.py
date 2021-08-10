@@ -18,8 +18,11 @@ def main():
     original_lines = [
         line.strip() for line in open(args.input_file, 'r') if line != ''
     ]
+    good_lines = [
+        line for line in original_lines if any(c.isalpha() for c in line)
+    ]
 
-    new_lines = random.sample(original_lines, args.new_num_lines)
+    new_lines = random.sample(good_lines, args.new_num_lines)
 
     with open(args.output_file, 'w+') as fout:
         for line in new_lines:
