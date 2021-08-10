@@ -38,7 +38,7 @@ Total number of unique characters: 63
 Average token length of all tokens in file: 8.8
 Average token length of all unique tokens in file: 10.68
 
-Filename: dev.gn
+Filename: dev.gug
 Number of lines: 995
 Total number of tokens: 7191
 Number of unique tokens: 3181
@@ -148,7 +148,7 @@ Total number of unique characters: 65
 Average token length of all tokens in file: 8.91
 Average token length of all unique tokens in file: 10.59
 
-Filename: train.gn
+Filename: train.gug
 Number of lines: 26009
 Total number of tokens: 405548
 Number of unique tokens: 44787

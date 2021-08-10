@@ -14,23 +14,50 @@ development files have been compiled containing the data from all ten Indigenous
 languages. The original parallel Spanish sentences have been omitted
 
 ## Included Languages
-- [Ashaninka](https://en.wikipedia.org/wiki/Asháninka_language)
-- [Aymara](https://en.wikipedia.org/wiki/Aymara_language)
-- [Bribri](https://en.wikipedia.org/wiki/Bribri_language)
-- [Guarani](https://en.wikipedia.org/wiki/Guarani_language)
-- [Hñähñu](https://en.wikipedia.org/wiki/Otomi_language)
-- [Nahuatl](https://en.wikipedia.org/wiki/Nahuatl)
-- [Quechua](https://en.wikipedia.org/wiki/Southern_Quechua)
-- [Raramuri](https://en.wikipedia.org/wiki/Tarahumara_language)
-- [Shipibo Konibo](https://en.wikipedia.org/wiki/Shipibo_language)
-- [Wixarika](https://en.wikipedia.org/wiki/Huichol_language)
+- [Asháninka (cni)](https://en.wikipedia.org/wiki/Asháninka_language)
+- [Aymara (aym)](https://en.wikipedia.org/wiki/Aymara_language)
+- [Bribri (bzd)](https://en.wikipedia.org/wiki/Bribri_language)
+- [Guaraní (gug)](https://en.wikipedia.org/wiki/Guarani_language)
+- [Hñähñu (oto)](https://en.wikipedia.org/wiki/Otomi_language)
+- [Nahuatl (nah)](https://en.wikipedia.org/wiki/Nahuatl)
+- [Quechua (quy)](https://en.wikipedia.org/wiki/Southern_Quechua)
+- [Rarámuri (tar)](https://en.wikipedia.org/wiki/Tarahumara_language)
+- [Shipibo Konibo (shp)](https://en.wikipedia.org/wiki/Shipibo_language)
+- [Wixarika (hch)](https://en.wikipedia.org/wiki/Huichol_language)
 
 ## Data Composition
 
-`train.anlp` is composed of the concatenated training sets of the 10 languages. `dev.anlp` is similarly composed of the concatenated development sets
+`train.anlp` is composed of the concatenated training sets of the 10 languages.
+`dev.anlp` is similarly composed of the concatenated development sets
+
+### Training Sets
 
 | Language | File | Lines | Total Tokens | Unique Tokens | Total Characters | Unique Characters | Mean Token Length |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| All | train.anlp | 225,958 | 2,376,865 | 347,897| 16,787,156 | 253 | 7.06 |
+| All | train.anlp | 225,940 | 2,376,833 | 347,881| 16,786,932 | 253 | 7.06 |
+| Asháninka | train.cni | 3,883 | 26,096 | 12,490 | 232,494 | 65 | 8.91 |
+| Aymara | train.aym | 6,525 | 97,210 | 33,879 | 630,972 | 157 | 6.49 |
+| Bribri | train.bzd | 7,508 | 41,141 | 7,858 | 167,531 | 65 | 4.07 |
+| Guaraní | train.gug | 26,009 | 405,548 | 44,787 | 2,719,226 | 120 | 6.71 |
+| Hñähñu | train.oto | 4,889 | 72,280 | 8,664 | 275,696 | 90 | 3.81 |
+| Nahuatl | train.nah | 16,063 | 351,709 | 53,743 | 1,984,693 | 102 | 5.64 |
+| Quechua | train.quy | 122,803 | 1,167,390 | 146,080 | 9,647,783 | 115 | 8.26 |
+| Rarámuri | train.tar | 14,720 | 103,745 | 15,691 | 398,898 | 74 | 3.84 |
+| Shipibo Konibo | train.shp | 14,592 | 62,850 | 17,642 | 397,510 | 56 | 6.32 |
+| Wixarika | train.hch | 8,948 | 48,864 | 17,357 | 332,129 | 67 | 6.80 |
+
+### Development Sets
+
+| Language | File | Lines | Total Tokens | Unique Tokens | Total Characters | Unique Characters | Mean Token Length |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | All | dev.anlp | 9,122 | 79,901 | 27,597 | 485,179 | 105 | 6.07 |
-| Ashaninka | train.cni |
+| Asháninka | dev.cni | 883 | 6,070 | 3,100 | 53,401 | 63 | 8.80 |
+| Aymara | dev.aym | 996 | 7,080 | 3,908 | 53,852 | 64 | 7.61 |
+| Bribri | dev.bzd | 996 | 12,974 | 2,502 | 50,573 | 73 | 3.90 |
+| Guaraní | dev.gug | 995 | 7,191 | 3,181 | 48,516 | 70 | 6.75 |
+| Hñähñu | dev.oto | 599 | 5,069 | 1,595 | 22,712 | 69 | 4.48 |
+| Nahuatl | dev.nah | 672 | 4,300 | 1,839 | 31,338 | 56 | 7.29 |
+| Quechua | dev.quy | 996 | 7,406 | 3,826 | 58,005 | 62 | 7.83 |
+| Rarámuri | dev.tar | 995 | 10,377 | 2,964 | 55,644 | 48 | 5.36 |
+| Shipibo Konibo | dev.shp | 996 | 9,138 | 3,296 | 54,996 | 65 | 6.02 |
+| Wixarika | dev.hch | 994 | 10,296 | 3,895 | 56,142 | 62 | 5.45 |
