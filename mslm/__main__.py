@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader, RandomSampler
 
 from .mslm_config import MSLMConfig
 from .segmental_lm import SegmentalLanguageModel
-
+from .dev_config import devConfig
 # ------------------------------------------------------------------------------
 # Auxiliary Function Definitions
 # ------------------------------------------------------------------------------
@@ -115,14 +115,14 @@ def get_boundary_vector(sequence: List[List[str]]) -> List[int]:
     Extract a binary vector representing segmentation boundaries from a list of
     segments
 
-    The vector's length is equal to the number of symbols in the 
+    The vector's length is equal to the number of symbols in the
     sequence, where for every symbol, vector(x) = 1 if there is a boundary
     after the symbol at position x, and 0 if there is no boundary after the
     symbol at x. If the segmentation is considered "gold", the last value will
     be 1, otherwise 0
 
     Args:
-        sequence: A list of segments, which are themselves lists of string 
+        sequence: A list of segments, which are themselves lists of string
             symbols, from which to construct a (segment) boundary vector. Needs
             to be a list of lists because some items representing one "symbol"
             may be more than one character (e.g. `<tag>`)
@@ -169,7 +169,7 @@ def do_eval(
         device: The PyTorch device on which the model resides
         max_seg_len: The maximum segment length for the SLM model
         eoseg_idx: The index of the end-of-segment token
-        chars_to_subword_id: 
+        chars_to_subword_id:
         vocab: The Vocab object for the model
         gold_boundaries: The list of gold boundary vectors for the data
         unsort_permutation: The permutation with which to unsort the data
@@ -265,7 +265,7 @@ def statbar_string(stat_dict: dict) -> str:
 # ------------------------------------------------------------------------------
 
 
-def train(args, config, device, logger) -> None:
+def train(args, config, dev_config, device, logger) -> None:
     """
     Train a Segmental Language Model
     """
@@ -351,34 +351,220 @@ def train(args, config, device, logger) -> None:
         train_set, batch_size=None, sampler=random_sampler
     )
 
-    # Tokenize the train file by characters, adding <bos> and <eos>
-    # tags. Covert text to integer ids based on Vocab, and read into Dataset and
+    # Tokenize the dev file by characters, adding <bos> and <eos>
+    # tags. Convert text to integer ids based on Vocab, and read into Dataset and
     # Dataloader
-    dev_text = wr.character_tokenize(
-        args.dev_file, preserve_case=config.preserve_case, edge_tokens=True
-    )
-    dev_data = [vocab.to_ids(line) for line in dev_text]
-    dev_set = VariableLengthDataset(
-        dev_data,
-        batch_size=config.batch_size,
-        pad_value=pad_idx,
-        batch_by=config.batch_by,
-        max_padding=config.max_padding,
-        max_pad_strategy='split'
-    )
-    dev_dataloader = DataLoader(dev_set, batch_size=None)
-
-    # Also whitespace-tokenize the dev data, using the spaces to establish
-    # gold-standard segmentations for the dev data, which are converted to a
-    # binary "boundary" vector using get_boundary_vector
-    gold_dev_text = [
-        wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-            args.dev_file, preserve_case=config.preserve_case, split_tags=True
+    if args.dev_file:
+        dev_text = wr.character_tokenize(
+            args.dev_file, preserve_case=config.preserve_case, edge_tokens=True
         )
-    ]
-    gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
-    gold_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
-    all_gold_boundaries = np.array(wr.flatten(gold_boundaries))
+        dev_data = [vocab.to_ids(line) for line in dev_text]
+        dev_set = VariableLengthDataset(
+            dev_data,
+            batch_size=config.batch_size,
+            pad_value=pad_idx,
+            batch_by=config.batch_by,
+            max_padding=config.max_padding,
+            max_pad_strategy='split'
+        )
+        dev_dataloader = DataLoader(dev_set, batch_size=None)
+
+        # Also whitespace-tokenize the dev data, using the spaces to establish
+        # gold-standard segmentations for the dev data, which are converted to a
+        # binary "boundary" vector using get_boundary_vector
+        gold_dev_text = [
+            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                args.dev_file, preserve_case=config.preserve_case, split_tags=True
+            )
+        ]
+        gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
+        gold_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
+        all_gold_boundaries = np.array(wr.flatten(gold_boundaries))
+
+    elif args.dev_config:
+        #primary dev file
+        dev_text = wr.character_tokenize(
+            dev_config.primary_dev_file, preserve_case=config.preserve_case, edge_tokens=True
+        )
+        dev_data = [vocab.to_ids(line) for line in dev_text]
+        dev_set = VariableLengthDataset(
+            dev_data,
+            batch_size=config.batch_size,
+            pad_value=pad_idx,
+            batch_by=config.batch_by,
+            max_padding=config.max_padding,
+            max_pad_strategy='split'
+        )
+        dev_dataloader = DataLoader(dev_set, batch_size=None)
+
+        # Also whitespace-tokenize the dev data, using the spaces to establish
+        # gold-standard segmentations for the dev data, which are converted to a
+        # binary "boundary" vector using get_boundary_vector
+        gold_dev_text = [
+            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                dev_config.primary_dev_file, preserve_case=config.preserve_case, split_tags=True
+            )
+        ]
+        gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
+        gold_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
+        all_gold_boundaries = np.array(wr.flatten(gold_boundaries))
+
+        #bpc mode secondary dev files
+        if dev_config.bpc_secondary_dev_files:
+            bpc_secondary_dev_texts = []
+            for d_file in dev_config.bpc_secondary_dev_files:
+                d_text = wr.character_tokenize(
+                    d_file, preserve_case=config.preserve_case, edge_tokens=True
+                )
+                bpc_secondary_dev_texts.append(d_text)
+
+            bpc_secondary_dev_datas = []
+            for d_text in bpc_secondary_dev_texts:
+                d_data = [vocab.to_ids(line) for line in d_text]
+                bpc_secondary_dev_datas.append(d_data)
+
+            bpc_secondary_dev_sets = []
+            for d_data in bpc_secondary_dev_datas:
+                d_set = VariableLengthDataset(
+                    d_data,
+                    batch_size=config.batch_size,
+                    pad_value=pad_idx,
+                    batch_by=config.batch_by,
+                    max_padding=config.max_padding,
+                    max_pad_strategy='split'
+                )
+                bpc_secondary_dev_sets.append(d_set)
+
+            bpc_secondary_dev_dataloaders = []
+            for d_set in bpc_secondary_dev_sets:
+                d_dataloader = DataLoader(d_set, batch_size=None)
+                bpc_secondary_dev_dataloaders.append(d_dataloader)
+
+            bpc_secondary_gold_dev_texts = []
+            bpc_secondary_gold_boundaries = []
+            bpc_secondary_all_gold_boundaries = []
+
+            for d_file in dev_config.bpc_secondary_dev_files:
+                counter = 0
+                gold_d_text = [
+                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                        d_file, preserve_case=config.preserve_case, split_tags=True
+                    )
+                ]
+                gold_d_text = gold_d_text[:bpc_secondary_dev_sets[counter].total_num_instances]
+                bpc_secondary_gold_dev_texts.append(gold_d_text)
+
+                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
+                bpc_secondary_gold_boundaries.append(g_boundaries)
+
+                all_g_boundaries = np.array(wr.flatten(g_boundaries))
+                bpc_secondary_all_gold_boundaries.append(all_g_boundaries)
+                counter += 1
+
+        #seg qual mode secondary dev files
+        if dev_config.seg_secondary_dev_files:
+            seg_secondary_dev_texts = []
+            for d_file in dev_config.seg_secondary_dev_files:
+                d_text = wr.character_tokenize(
+                    d_file, preserve_case=config.preserve_case, edge_tokens=True
+                )
+                seg_secondary_dev_texts.append(d_text)
+
+            seg_secondary_dev_datas = []
+            for d_text in seg_secondary_dev_texts:
+                d_data = [vocab.to_ids(line) for line in d_text]
+                seg_secondary_dev_datas.append(d_data)
+
+            seg_secondary_dev_sets = []
+            for d_data in seg_secondary_dev_datas:
+                d_set = VariableLengthDataset(
+                    d_data,
+                    batch_size=config.batch_size,
+                    pad_value=pad_idx,
+                    batch_by=config.batch_by,
+                    max_padding=config.max_padding,
+                    max_pad_strategy='split'
+                )
+                seg_secondary_dev_sets.append(d_set)
+
+            seg_secondary_dev_dataloaders = []
+            for d_set in seg_secondary_dev_sets:
+                d_dataloader = DataLoader(d_set, batch_size=None)
+                seg_secondary_dev_dataloaders.append(d_dataloader)
+
+            seg_secondary_gold_dev_texts = []
+            seg_secondary_gold_boundaries = []
+            seg_secondary_all_gold_boundaries = []
+
+            for d_file in dev_config.seg_secondary_dev_files:
+                counter = 0
+                gold_d_text = [
+                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                        d_file, preserve_case=config.preserve_case, split_tags=True
+                    )
+                ]
+                gold_d_text = gold_d_text[:seg_secondary_dev_sets[counter].total_num_instances]
+                seg_secondary_gold_dev_texts.append(gold_d_text)
+
+                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
+                seg_secondary_gold_boundaries.append(g_boundaries)
+
+                all_g_boundaries = np.array(wr.flatten(g_boundaries))
+                seg_secondary_all_gold_boundaries.append(all_g_boundaries)
+                counter += 1
+
+        #both mode secondary dev files
+        if dev_config.both_secondary_dev_files:
+            both_secondary_dev_texts = []
+            for d_file in dev_config.both_secondary_dev_files:
+                d_text = wr.character_tokenize(
+                    d_file, preserve_case=config.preserve_case, edge_tokens=True
+                )
+                both_secondary_dev_texts.append(d_text)
+
+            both_secondary_dev_datas = []
+            for d_text in both_secondary_dev_texts:
+                d_data = [vocab.to_ids(line) for line in d_text]
+                both_secondary_dev_datas.append(d_data)
+
+            both_secondary_dev_sets = []
+            for d_data in both_secondary_dev_datas:
+                d_set = VariableLengthDataset(
+                    d_data,
+                    batch_size=config.batch_size,
+                    pad_value=pad_idx,
+                    batch_by=config.batch_by,
+                    max_padding=config.max_padding,
+                    max_pad_strategy='split'
+                )
+                both_secondary_dev_sets.append(d_set)
+
+            both_secondary_dev_dataloaders = []
+            for d_set in both_secondary_dev_sets:
+                d_dataloader = DataLoader(d_set, batch_size=None)
+                both_secondary_dev_dataloaders.append(d_dataloader)
+
+            both_secondary_gold_dev_texts = []
+            both_secondary_gold_boundaries = []
+            both_secondary_all_gold_boundaries = []
+
+            for d_file in dev_config.both_secondary_dev_files:
+                counter = 0
+                gold_d_text = [
+                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                        d_file, preserve_case=config.preserve_case, split_tags=True
+                    )
+                ]
+                gold_d_text = gold_d_text[:both_secondary_dev_sets[counter].total_num_instances]
+                both_secondary_gold_dev_texts.append(gold_d_text)
+
+                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
+                both_secondary_gold_boundaries.append(g_boundaries)
+
+                all_g_boundaries = np.array(wr.flatten(g_boundaries))
+                both_secondary_all_gold_boundaries.append(all_g_boundaries)
+                counter += 1
+
 
     # If training an existing model, read it from the checkpoint and load in the
     # parameters, else create a new model instantiation based on the input
@@ -458,26 +644,135 @@ def train(args, config, device, logger) -> None:
         optimizer, lr_lambda=lr_lambda
     )
 
-    # Write the metric field headers to the output csv file
+    # Write the metric field headers to the output csv file(s)
     metrics = [
         "step", "s/batch", "lr", "train_loss", "dev_loss", "mcc", "f1",
         "precision", "recall"
     ]
-    with open(args.model_path + '.csv', 'w+') as data_file:
-        print(', '.join(metrics), file=data_file)
+    bpc_metrics = [
+        "step", "s/batch", "lr", "train_loss", "dev_loss", "precision",
+        "recall"
+    ]
+    seg_metrics = [
+        "step", "s/batch", "lr", "train_loss", "mcc", "f1",
+        "precision", "recall"
+    ]
 
-    eval_args = {
-        'model': model,
-        'data_loader': dev_dataloader,
-        'device': device,
-        'max_seg_len': config.max_seg_length,
-        'eoseg_idx': eoseg_idx,
-        'chars_to_subword_id': char_ids_to_subword_id,
-        'vocab': vocab,
-        'gold_boundaries': all_gold_boundaries,
-        'unsort_permutation': dev_set.unsort_pmt,
-        'clear_cache_by_batch': config.clear_cache_by_batch
-    }
+    if args.dev_file:
+        with open(args.model_path + '.csv', 'w+') as data_file:
+            print(', '.join(metrics), file=data_file)
+    elif args.dev_config:
+        if dev_config.primary_dev_mode == 'bpc':
+            with open(args.model_path + '.csv', 'w+') as data_file:
+                print(', '.join(bpc_metrics), file=data_file)
+        elif dev_config.primary_dev_mode == 'seg':
+            with open(args.model_path + '.csv', 'w+') as data_file:
+                print(', '.join(seg_metrics), file=data_file)
+        elif dev_config.primary_dev_mode == 'both':
+            with open(args.model_path + '.csv', 'w+') as data_file:
+                print(', '.join(metrics), file=data_file)
+
+        if dev_config.bpc_secondary_dev_files:
+            for d_file in dev_config.bpc_secondary_dev_files:
+                with open(args.model_path + '_' + d_file.replace('/','_') +'.csv', 'w+') as data_file:
+                    print(', '.join(bpc_metrics), file=data_file)
+
+        if dev_config.seg_secondary_dev_files:
+            for d_file in dev_config.seg_secondary_dev_files:
+                with open(args.model_path + '_' + d_file.replace('/','_') +'.csv', 'w+') as data_file:
+                    print(', '.join(seg_metrics), file=data_file)
+
+        if dev_config.both_secondary_dev_files:
+            for d_file in dev_config.both_secondary_dev_files:
+                with open(args.model_path + '_' + d_file.replace('/','_') +'.csv', 'w+') as data_file:
+                    print(', '.join(metrics), file=data_file)
+
+
+    #Make eval_args
+    if args.dev_file:
+        eval_args = {
+            'model': model,
+            'data_loader': dev_dataloader,
+            'device': device,
+            'max_seg_len': config.max_seg_length,
+            'eoseg_idx': eoseg_idx,
+            'chars_to_subword_id': char_ids_to_subword_id,
+            'vocab': vocab,
+            'gold_boundaries': all_gold_boundaries,
+            'unsort_permutation': dev_set.unsort_pmt,
+            'clear_cache_by_batch': config.clear_cache_by_batch
+        }
+
+    elif args.dev_config:
+        #primary dev file
+        eval_args = {
+            'model': model,
+            'data_loader': dev_dataloader,
+            'device': device,
+            'max_seg_len': config.max_seg_length,
+            'eoseg_idx': eoseg_idx,
+            'chars_to_subword_id': char_ids_to_subword_id,
+            'vocab': vocab,
+            'gold_boundaries': all_gold_boundaries,
+            'unsort_permutation': dev_set.unsort_pmt,
+            'clear_cache_by_batch': config.clear_cache_by_batch
+        }
+
+        #bpc mode secondary dev files
+        if dev_config.bpc_secondary_dev_files:
+                list_of_bpc_secondary_eval_args = []
+                for i in range(len(bpc_secondary_dev_dataloaders)):
+                    bpc_secondary_eval_args = {
+                        'model': model,
+                        'data_loader': bpc_secondary_dev_dataloaders[i],
+                        'device': device,
+                        'max_seg_len': config.max_seg_length,
+                        'eoseg_idx': eoseg_idx,
+                        'chars_to_subword_id': char_ids_to_subword_id,
+                        'vocab': vocab,
+                        'gold_boundaries': bpc_secondary_all_gold_boundaries[i],
+                        'unsort_permutation': bpc_secondary_dev_sets[i].unsort_pmt,
+                        'clear_cache_by_batch': config.clear_cache_by_batch
+                    }
+                    list_of_bpc_secondary_eval_args.append(bpc_secondary_eval_args)
+
+        #seg qual mode secondary dev files
+        if dev_config.seg_secondary_dev_files:
+            list_of_seg_secondary_eval_args = []
+            for i in range(len(seg_secondary_dev_dataloaders)):
+                seg_secondary_eval_args = {
+                    'model': model,
+                    'data_loader': seg_secondary_dev_dataloaders[i],
+                    'device': device,
+                    'max_seg_len': config.max_seg_length,
+                    'eoseg_idx': eoseg_idx,
+                    'chars_to_subword_id': char_ids_to_subword_id,
+                    'vocab': vocab,
+                    'gold_boundaries': seg_secondary_all_gold_boundaries[i],
+                    'unsort_permutation': seg_secondary_dev_sets[i].unsort_pmt,
+                    'clear_cache_by_batch': config.clear_cache_by_batch
+                }
+                list_of_seg_secondary_eval_args.append(seg_secondary_eval_args)
+
+        #both mode secondary dev files
+        if dev_config.both_secondary_dev_files:
+            list_of_both_secondary_eval_args = []
+            for i in range(len(both_secondary_dev_dataloaders)):
+                both_secondary_eval_args = {
+                    'model': model,
+                    'data_loader': both_secondary_dev_dataloaders[i],
+                    'device': device,
+                    'max_seg_len': config.max_seg_length,
+                    'eoseg_idx': eoseg_idx,
+                    'chars_to_subword_id': char_ids_to_subword_id,
+                    'vocab': vocab,
+                    'gold_boundaries': both_secondary_all_gold_boundaries[i],
+                    'unsort_permutation': both_secondary_dev_sets[i].unsort_pmt,
+                    'clear_cache_by_batch': config.clear_cache_by_batch
+                }
+                list_of_both_secondary_eval_args.append(both_secondary_eval_args)
+
+
 
     train_args = {
         'data': None,
@@ -506,6 +801,145 @@ def train(args, config, device, logger) -> None:
         # At the very beginning of training, do an eval run and record baseline
         # metrics, writing to the output metric file
         if global_step == 0:
+            if args.dev_file:
+                with torch.no_grad():
+                    dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                logger.info(statbar_string(dev_stat_dict))
+
+                print("Sample dev segmentations:")
+                for seg in dev_segmentations[:8]:
+                    print("    " + ' '.join([''.join(segment) for segment in seg]))
+
+                metrics = [
+                    global_step, "n/a",
+                    round(scheduler.get_last_lr()[0],
+                          7), "n/a", dev_stat_dict['dev loss'],
+                    dev_stat_dict['mcc'], dev_stat_dict['f1'],
+                    dev_stat_dict['precision'], dev_stat_dict['recall']
+                ]
+                metrics = [str(m) for m in metrics]
+                with open(args.model_path + '.csv', 'a+') as data_file:
+                    print(', '.join(metrics), file=data_file)
+
+            elif args.dev_config:
+                if dev_config.primary_dev_mode == 'bpc':
+                    with torch.no_grad():
+                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                    logger.info(statbar_string(dev_stat_dict))
+
+                    print("Sample dev segmentations:")
+                    for seg in dev_segmentations[:8]:
+                        print("    " + ' '.join([''.join(segment) for segment in seg]))
+
+                    metrics = [
+                        global_step, "n/a",
+                        round(scheduler.get_last_lr()[0],
+                              7), "n/a", dev_stat_dict['dev loss'],
+                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                    ]
+                    metrics = [str(m) for m in metrics]
+                    with open(args.model_path + '.csv', 'a+') as data_file:
+                        print(', '.join(metrics), file=data_file)
+
+
+                elif dev_config.primary_dev_mode == 'seg':
+                    with torch.no_grad():
+                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                    logger.info(statbar_string(dev_stat_dict))
+
+                    print("Sample dev segmentations:")
+                    for seg in dev_segmentations[:8]:
+                        print("    " + ' '.join([''.join(segment) for segment in seg]))
+
+                    metrics = [
+                        global_step, "n/a",
+                        round(scheduler.get_last_lr()[0],
+                              7), "n/a",
+                        dev_stat_dict['mcc'], dev_stat_dict['f1'],
+                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                    ]
+                    metrics = [str(m) for m in metrics]
+                    with open(args.model_path + '.csv', 'a+') as data_file:
+                        print(', '.join(metrics), file=data_file)
+
+
+
+                elif dev_config.primary_dev_mode == 'both':
+                    with torch.no_grad():
+                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                    logger.info(statbar_string(dev_stat_dict))
+
+                    print("Sample dev segmentations:")
+                    for seg in dev_segmentations[:8]:
+                        print("    " + ' '.join([''.join(segment) for segment in seg]))
+
+                    metrics = [
+                        global_step, "n/a",
+                        round(scheduler.get_last_lr()[0],
+                              7), "n/a", dev_stat_dict['dev loss'],
+                        dev_stat_dict['mcc'], dev_stat_dict['f1'],
+                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                    ]
+                    metrics = [str(m) for m in metrics]
+                    with open(args.model_path + '.csv', 'a+') as data_file:
+                        print(', '.join(metrics), file=data_file)
+
+
+                if dev_config.bpc_secondary_dev_files:
+                    l_counter = 0
+                    for e_args in list_of_bpc_secondary_eval_args:
+                        with torch.no_grad():
+                            bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(**e_args)
+                            metrics = [
+                                global_step, "n/a",
+                                round(scheduler.get_last_lr()[0],
+                                      7), "n/a", bpc_dev_stat_dict['dev loss'],
+                                bpc_dev_stat_dict['precision'], bpc_dev_stat_dict['recall']
+                            ]
+                            metrics = [str(m) for m in metrics]
+                            with open(args.model_path + '_' + dev_config.bpc_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                print(', '.join(metrics), file=dev_data_file)
+                            l_counter += 1
+
+                if dev_config.seg_secondary_dev_files:
+                    l_counter = 0
+                    for e_args in list_of_seg_secondary_eval_args:
+                        with torch.no_grad():
+                            seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(**e_args)
+                            metrics = [
+                                global_step, "n/a",
+                                round(scheduler.get_last_lr()[0],
+                                      7), "n/a",
+                                seg_dev_stat_dict['mcc'], seg_dev_stat_dict['f1'],
+                                seg_dev_stat_dict['precision'], seg_dev_stat_dict['recall']
+                            ]
+                            metrics = [str(m) for m in metrics]
+                            with open(args.model_path + '_' + dev_config.seg_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                print(', '.join(metrics), file=dev_data_file)
+                            l_counter += 1
+
+                if dev_config.both_secondary_dev_files:
+                    l_counter = 0
+                    for e_args in list_of_both_secondary_eval_args:
+                        with torch.no_grad():
+                            both_dev_stat_dict, both_dev_stat_segmentations = do_eval(**e_args)
+                            metrics = [
+                                global_step, "n/a",
+                                round(scheduler.get_last_lr()[0],
+                                      7), "n/a", both_dev_stat_dict['dev loss'],
+                                both_dev_stat_dict['mcc'], both_dev_stat_dict['f1'],
+                                both_dev_stat_dict['precision'], both_dev_stat_dict['recall']
+                            ]
+                            metrics = [str(m) for m in metrics]
+                            with open(args.model_path + '_' + dev_config.both_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                print(', '.join(metrics), file=dev_data_file)
+                            l_counter += 1
+
+            """
             with torch.no_grad():
                 dev_stat_dict, dev_segmentations = do_eval(**eval_args)
 
@@ -525,6 +959,7 @@ def train(args, config, device, logger) -> None:
             metrics = [str(m) for m in metrics]
             with open(args.model_path + '.csv', 'a+') as data_file:
                 print(', '.join(metrics), file=data_file)
+            """
 
             checkpoint_start_time = time.time()
             checkpoint_stats = defaultdict(list)
@@ -594,6 +1029,471 @@ def train(args, config, device, logger) -> None:
                 time_per_batch = round(elapsed / batches_in_checkpoint, 2)
                 current_train_loss = mean(checkpoint_stats['loss'])
 
+
+                if args.dev_file:
+                    # Perform an eval run on the dev data
+                    with torch.no_grad():
+                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                    # Print the current step, batch, learning rate, average time
+                    # per batch, training loss, dev f1, and example segmentations
+                    # for the current model
+                    dev_stat_dict.update(
+                        {
+                            "step": f"{global_step}/{config.max_train_steps}",
+                            "s/batch": time_per_batch,
+                            "lr": round(lr, 5),
+                            "train loss": round(current_train_loss, 3),
+                        }
+                    )
+
+                    logger.info(statbar_string(dev_stat_dict))
+
+                    time_profile_dict = {
+                        "average forward time":
+                            f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
+                        "forward nn":
+                            f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
+                        "forward lattice":
+                            f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
+                        "backward":
+                            f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
+                        "optimizer":
+                            f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
+                    }
+
+                    logger.info(statbar_string(time_profile_dict))
+
+                    print("Sample dev segmentations:")
+                    for seg in dev_segmentations[:8]:
+                        print(
+                            "    " +
+                            ' '.join([''.join(segment) for segment in seg])
+                        )
+
+                    dev_loss = dev_stat_dict['dev loss']
+                    mcc = dev_stat_dict['mcc']
+                    f1 = dev_stat_dict['f1']
+
+                    metrics = [
+                        global_step, time_per_batch,
+                        round(lr, 7),
+                        round(current_train_loss, 2), dev_loss, mcc, f1,
+                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                    ]
+                    metrics = [str(m) for m in metrics]
+                    with open(args.model_path + '.csv', 'a+') as data_file:
+                        print(', '.join(metrics), file=data_file)
+
+                    # If the dev loss from the current checkpoint is better than
+                    # the current best, save the current model to a file
+                    checkpoint = {
+                        'model_architecture': model_architecture,
+                        'state_dict': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'scheduler': scheduler.state_dict(),
+                        'vocab_file': vocab_file,
+                        'subword_vocab_file': subword_vocab_file
+                    }
+                    if dev_loss < best_loss:
+                        best_loss = dev_loss
+                        torch.save(checkpoint, args.model_path + '_best_loss.model')
+                        logger.info(f"New best loss at step {global_step}")
+                        checkpoints_wo_improvement = 0
+                    else:
+                        checkpoints_wo_improvement += 1
+                        improvement_stopped = (
+                            config.early_stopping and
+                            checkpoints_wo_improvement >= config.early_stopping
+                        )
+                        if improvement_stopped:
+                            logger.info(
+                                f"Stopping early at step {global_step} due to no"
+                                f" dev loss improvement in {config.early_stopping}"
+                                " checkpoints"
+                            )
+                            torch.save(checkpoint, args.model_path + '_final.model')
+                            logger.info(
+                                f"Saved model at step {global_step} as final model"
+                            )
+                            early_stop = True
+                            break
+                    if mcc > best_mcc:
+                        best_mcc = mcc
+                        torch.save(checkpoint, args.model_path + '_best_mcc.model')
+                        logger.info(f"New best mcc at step {global_step}")
+                    if f1 > best_f1:
+                        best_f1 = f1
+                        torch.save(checkpoint, args.model_path + '_best_f1.model')
+                        logger.info(f"New best f1 at step {global_step}")
+                    if is_final:
+                        torch.save(checkpoint, args.model_path + '_final.model')
+                        break
+
+
+                elif args.dev_config:
+                    if dev_config.primary_dev_mode == 'bpc':
+                        # Perform an eval run on the dev data
+                        with torch.no_grad():
+                            dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                        # Print the current step, batch, learning rate, average time
+                        # per batch, training loss, dev f1, and example segmentations
+                        # for the current model
+                        dev_stat_dict.update(
+                            {
+                                "step": f"{global_step}/{config.max_train_steps}",
+                                "s/batch": time_per_batch,
+                                "lr": round(lr, 5),
+                                "train loss": round(current_train_loss, 3),
+                            }
+                        )
+
+                        logger.info(statbar_string(dev_stat_dict))
+
+                        time_profile_dict = {
+                            "average forward time":
+                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
+                            "forward nn":
+                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
+                            "forward lattice":
+                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
+                            "backward":
+                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
+                            "optimizer":
+                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
+                        }
+
+                        logger.info(statbar_string(time_profile_dict))
+
+                        print("Sample dev segmentations:")
+                        for seg in dev_segmentations[:8]:
+                            print(
+                                "    " +
+                                ' '.join([''.join(segment) for segment in seg])
+                            )
+
+                        dev_loss = dev_stat_dict['dev loss']
+
+                        metrics = [
+                            global_step, time_per_batch,
+                            round(lr, 7),
+                            round(current_train_loss, 2), dev_loss,
+                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                        ]
+                        metrics = [str(m) for m in metrics]
+                        with open(args.model_path + '.csv', 'a+') as data_file:
+                            print(', '.join(metrics), file=data_file)
+
+                        # If the dev loss from the current checkpoint is better than
+                        # the current best, save the current model to a file
+                        checkpoint = {
+                            'model_architecture': model_architecture,
+                            'state_dict': model.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'scheduler': scheduler.state_dict(),
+                            'vocab_file': vocab_file,
+                            'subword_vocab_file': subword_vocab_file
+                        }
+                        if dev_loss < best_loss:
+                            best_loss = dev_loss
+                            torch.save(checkpoint, args.model_path + '_best_loss.model')
+                            logger.info(f"New best loss at step {global_step}")
+                            checkpoints_wo_improvement = 0
+                        else:
+                            checkpoints_wo_improvement += 1
+                            improvement_stopped = (
+                                config.early_stopping and
+                                checkpoints_wo_improvement >= config.early_stopping
+                            )
+                            if improvement_stopped:
+                                logger.info(
+                                    f"Stopping early at step {global_step} due to no"
+                                    f" dev loss improvement in {config.early_stopping}"
+                                    " checkpoints"
+                                )
+                                torch.save(checkpoint, args.model_path + '_final.model')
+                                logger.info(
+                                    f"Saved model at step {global_step} as final model"
+                                )
+                                early_stop = True
+                                break
+
+                        if is_final:
+                            torch.save(checkpoint, args.model_path + '_final.model')
+                            break
+
+
+
+                    elif dev_config.primary_dev_mode == 'seg':
+                        # Perform an eval run on the dev data
+                        with torch.no_grad():
+                            dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                        # Print the current step, batch, learning rate, average time
+                        # per batch, training loss, dev f1, and example segmentations
+                        # for the current model
+                        dev_stat_dict.update(
+                            {
+                                "step": f"{global_step}/{config.max_train_steps}",
+                                "s/batch": time_per_batch,
+                                "lr": round(lr, 5),
+                                "train loss": round(current_train_loss, 3),
+                            }
+                        )
+
+                        logger.info(statbar_string(dev_stat_dict))
+
+                        time_profile_dict = {
+                            "average forward time":
+                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
+                            "forward nn":
+                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
+                            "forward lattice":
+                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
+                            "backward":
+                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
+                            "optimizer":
+                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
+                        }
+
+                        logger.info(statbar_string(time_profile_dict))
+
+                        print("Sample dev segmentations:")
+                        for seg in dev_segmentations[:8]:
+                            print(
+                                "    " +
+                                ' '.join([''.join(segment) for segment in seg])
+                            )
+
+                        dev_loss = dev_stat_dict['dev loss']
+                        mcc = dev_stat_dict['mcc']
+                        f1 = dev_stat_dict['f1']
+
+                        metrics = [
+                            global_step, time_per_batch,
+                            round(lr, 7),
+                            round(current_train_loss, 2), mcc, f1,
+                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                        ]
+                        metrics = [str(m) for m in metrics]
+                        with open(args.model_path + '.csv', 'a+') as data_file:
+                            print(', '.join(metrics), file=data_file)
+
+                        # If the dev loss from the current checkpoint is better than
+                        # the current best, save the current model to a file
+                        checkpoint = {
+                            'model_architecture': model_architecture,
+                            'state_dict': model.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'scheduler': scheduler.state_dict(),
+                            'vocab_file': vocab_file,
+                            'subword_vocab_file': subword_vocab_file
+                        }
+                        if dev_loss < best_loss:
+                            best_loss = dev_loss
+                            torch.save(checkpoint, args.model_path + '_best_loss.model')
+                            logger.info(f"New best loss at step {global_step}")
+                            checkpoints_wo_improvement = 0
+                        else:
+                            checkpoints_wo_improvement += 1
+                            improvement_stopped = (
+                                config.early_stopping and
+                                checkpoints_wo_improvement >= config.early_stopping
+                            )
+                            if improvement_stopped:
+                                logger.info(
+                                    f"Stopping early at step {global_step} due to no"
+                                    f" dev loss improvement in {config.early_stopping}"
+                                    " checkpoints"
+                                )
+                                torch.save(checkpoint, args.model_path + '_final.model')
+                                logger.info(
+                                    f"Saved model at step {global_step} as final model"
+                                )
+                                early_stop = True
+                                break
+                        if mcc > best_mcc:
+                            best_mcc = mcc
+                            torch.save(checkpoint, args.model_path + '_best_mcc.model')
+                            logger.info(f"New best mcc at step {global_step}")
+                        if f1 > best_f1:
+                            best_f1 = f1
+                            torch.save(checkpoint, args.model_path + '_best_f1.model')
+                            logger.info(f"New best f1 at step {global_step}")
+                        if is_final:
+                            torch.save(checkpoint, args.model_path + '_final.model')
+                            break
+
+
+
+                    elif dev_config.primary_dev_mode == 'both':
+                        # Perform an eval run on the dev data
+                        with torch.no_grad():
+                            dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+                        # Print the current step, batch, learning rate, average time
+                        # per batch, training loss, dev f1, and example segmentations
+                        # for the current model
+                        dev_stat_dict.update(
+                            {
+                                "step": f"{global_step}/{config.max_train_steps}",
+                                "s/batch": time_per_batch,
+                                "lr": round(lr, 5),
+                                "train loss": round(current_train_loss, 3),
+                            }
+                        )
+
+                        logger.info(statbar_string(dev_stat_dict))
+
+                        time_profile_dict = {
+                            "average forward time":
+                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
+                            "forward nn":
+                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
+                            "forward lattice":
+                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
+                            "backward":
+                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
+                            "optimizer":
+                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
+                        }
+
+                        logger.info(statbar_string(time_profile_dict))
+
+                        print("Sample dev segmentations:")
+                        for seg in dev_segmentations[:8]:
+                            print(
+                                "    " +
+                                ' '.join([''.join(segment) for segment in seg])
+                            )
+
+                        dev_loss = dev_stat_dict['dev loss']
+                        mcc = dev_stat_dict['mcc']
+                        f1 = dev_stat_dict['f1']
+
+                        metrics = [
+                            global_step, time_per_batch,
+                            round(lr, 7),
+                            round(current_train_loss, 2), dev_loss, mcc, f1,
+                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                        ]
+                        metrics = [str(m) for m in metrics]
+                        with open(args.model_path + '.csv', 'a+') as data_file:
+                            print(', '.join(metrics), file=data_file)
+
+                        # If the dev loss from the current checkpoint is better than
+                        # the current best, save the current model to a file
+                        checkpoint = {
+                            'model_architecture': model_architecture,
+                            'state_dict': model.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'scheduler': scheduler.state_dict(),
+                            'vocab_file': vocab_file,
+                            'subword_vocab_file': subword_vocab_file
+                        }
+                        if dev_loss < best_loss:
+                            best_loss = dev_loss
+                            torch.save(checkpoint, args.model_path + '_best_loss.model')
+                            logger.info(f"New best loss at step {global_step}")
+                            checkpoints_wo_improvement = 0
+                        else:
+                            checkpoints_wo_improvement += 1
+                            improvement_stopped = (
+                                config.early_stopping and
+                                checkpoints_wo_improvement >= config.early_stopping
+                            )
+                            if improvement_stopped:
+                                logger.info(
+                                    f"Stopping early at step {global_step} due to no"
+                                    f" dev loss improvement in {config.early_stopping}"
+                                    " checkpoints"
+                                )
+                                torch.save(checkpoint, args.model_path + '_final.model')
+                                logger.info(
+                                    f"Saved model at step {global_step} as final model"
+                                )
+                                early_stop = True
+                                break
+                        if mcc > best_mcc:
+                            best_mcc = mcc
+                            torch.save(checkpoint, args.model_path + '_best_mcc.model')
+                            logger.info(f"New best mcc at step {global_step}")
+                        if f1 > best_f1:
+                            best_f1 = f1
+                            torch.save(checkpoint, args.model_path + '_best_f1.model')
+                            logger.info(f"New best f1 at step {global_step}")
+                        if is_final:
+                            torch.save(checkpoint, args.model_path + '_final.model')
+                            break
+
+
+
+                    if dev_config.bpc_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_bpc_secondary_eval_args:
+                            with torch.no_grad():
+                                bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(**e_args)
+
+                                dev_loss = bpc_dev_stat_dict['dev loss']
+
+                                metrics = [
+                                    global_step, time_per_batch,
+                                    round(lr, 7),
+                                    round(current_train_loss, 2), dev_loss,
+                                    bpc_dev_stat_dict['precision'], bpc_dev_stat_dict['recall']
+                                ]
+                                metrics = [str(m) for m in metrics]
+                                with open(args.model_path + '_' + dev_config.bpc_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                    print(', '.join(metrics), file=dev_data_file)
+                                l_counter += 1
+
+                    if dev_config.seg_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_seg_secondary_eval_args:
+                            with torch.no_grad():
+                                seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(**e_args)
+
+                                mcc = seg_dev_stat_dict['mcc']
+                                f1 = seg_dev_stat_dict['f1']
+
+                                metrics = [
+                                    global_step, time_per_batch,
+                                    round(lr, 7),
+                                    round(current_train_loss, 2), mcc, f1,
+                                    seg_dev_stat_dict['precision'], seg_dev_stat_dict['recall']
+                                ]
+                                metrics = [str(m) for m in metrics]
+                                with open(args.model_path + '_' + dev_config.seg_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                    print(', '.join(metrics), file=dev_data_file)
+                                l_counter += 1
+
+                    if dev_config.both_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_both_secondary_eval_args:
+                            with torch.no_grad():
+                                both_dev_stat_dict, both_dev_stat_segmentations = do_eval(**e_args)
+
+                                dev_loss = both_dev_stat_dict['dev loss']
+                                mcc = both_dev_stat_dict['mcc']
+                                f1 = both_dev_stat_dict['f1']
+
+                                metrics = [
+                                    global_step, time_per_batch,
+                                    round(lr, 7),
+                                    round(current_train_loss, 2), dev_loss, mcc, f1,
+                                    both_dev_stat_dict['precision'], both_dev_stat_dict['recall']
+                                ]
+                                metrics = [str(m) for m in metrics]
+                                with open(args.model_path + '_' + dev_config.both_secondary_dev_files[l_counter].replace('/','_') + '.csv', 'a+') as dev_data_file:
+                                    print(', '.join(metrics), file=dev_data_file)
+                                l_counter += 1
+
+
+
+
+
+                """
                 # Perform an eval run on the dev data
                 with torch.no_grad():
                     dev_stat_dict, dev_segmentations = do_eval(**eval_args)
@@ -692,6 +1592,7 @@ def train(args, config, device, logger) -> None:
                 if is_final:
                     torch.save(checkpoint, args.model_path + '_final.model')
                     break
+                """
 
                 # Reset the checkpoint loss and start time
                 checkpoint_start_time = time.time()
@@ -703,7 +1604,7 @@ def train(args, config, device, logger) -> None:
 def predict(args, config, device, logger):
 
     start_time = time.time()
-    
+
     checkpoint = torch.load(args.model_path + '.model', map_location=device)
     vocab = wr.Vocab.from_saved(checkpoint['vocab_file'])
     eoseg_idx = vocab.tok_to_id['<eoseg>']
@@ -715,11 +1616,11 @@ def predict(args, config, device, logger):
         char_ids_to_subword_id = import_or_create_subword_vocab(
             vocab, subword_vocab_file
         )
-    
+
     model = SegmentalLanguageModel(checkpoint['model_architecture']).to(device)
     model.load_state_dict(checkpoint['state_dict'])
     model.eval()
-    
+
     input_text = wr.character_tokenize(
         args.input_file, preserve_case=config.preserve_case, edge_tokens=True
     )
@@ -754,7 +1655,7 @@ def predict(args, config, device, logger):
         'gold_boundaries': all_gold_boundaries,
         'unsort_permutation': input_set.unsort_pmt
     }
-    
+
     with torch.no_grad():
         stat_dict, segmentations = do_eval(**eval_args)
 
@@ -828,8 +1729,20 @@ def main():
         default=None,
         help='File containing the dev data'
     )
+    parser.add_argument(
+        '--dev_config',
+        type=str,
+        default=None,
+        help='JSON file from which to load the dev data files configuration'
+    )
     args = parser.parse_args()
     args.preexisting_model = bool(args.preexisting_model)
+
+    #Make sure user uses either dev_file or dev_config, not both or neither
+    if args.dev_file and args.dev_config:
+        raise ValueError(f'Only use --dev_file or --dev_config, not both')
+    if not args.dev_file and not args.dev_config:
+        raise ValueError(f'Must use --dev_file or --dev_config')
 
     # Read in the configuration file if one is supplied, else use the default
     # configuration
@@ -837,6 +1750,18 @@ def main():
         config = MSLMConfig.from_json(args.config_file)
     else:
         config = MSLMConfig()
+
+    #Read in dev configuration file if one is supplied
+    if args.dev_config:
+        dev_config = devConfig.from_json(args.dev_config)
+        #If there is a dev config file, it must have a primary dev file
+        #and a primary dev mode
+        if not dev_config.primary_dev_file:
+            raise ValueError(f'Primary dev file {dev_config.primary_dev_file} is not valid')
+        if dev_config.primary_dev_mode not in ['bpc', 'seg', 'both']:
+            raise ValueError(f'Primary dev file mode {dev_config.primary_dev_mode} is not valid')
+    else:
+        dev_config = None
 
     # Set the random seed for all necessary packages
     random.seed(config.seed)
@@ -849,7 +1774,7 @@ def main():
         logger.info('Model Configuration:')
         print(config.__dict__)
         args.train_file = args.input_file
-        train(args=args, config=config, device=device, logger=logger)
+        train(args=args, config=config, dev_config = dev_config, device=device, logger=logger)
     elif args.mode == 'eval' or args.mode == 'predict':
         predict(args=args, config=config, device=device, logger=logger)
     else:
