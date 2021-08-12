@@ -5,11 +5,11 @@ segmentation
 
 Authors:
     C.M. Downey (cmdowney@uw.edu)
+    Shivin Thukral (shivin7@uw.edu)
 """
-import math
 import time
 import warnings
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import torch
 import numpy as np
@@ -21,9 +21,7 @@ from torch.nn.modules.transformer import (
 )
 
 from .lattice import AcyclicLattice
-from .segmental_transformer import (
-    SegmentalTransformerEncoder
-)
+from .segmental_transformer import SegmentalTransformerEncoder, compute_positional_encoding
 
 
 class SegmentalLanguageModel(nn.Module):
@@ -147,14 +145,6 @@ class SegmentalLanguageModel(nn.Module):
         device = torch.device('cuda' if using_cuda else 'cpu')
 
         max_seg_len = min(max_seg_len, seq_length - 2)
-        
-        # Initialize the score for each possible segment to an approximation of
-        # infinity (log probability)
-        loginf = 1000000.0
-        segment_scores = torch.empty(
-            seq_length - 1, max_seg_len, batch_size
-        ).fill_(-loginf).to(device)
-        total_loss = 0
 
         # If expected length is to be calculated, ensure that the length
         # exponent is set to a valid value
@@ -194,6 +184,50 @@ class SegmentalLanguageModel(nn.Module):
 
         nn_start_time = time.time()
 
+        # Compute the embeddings and encoder outputs from the input sequences
+        embedded_seq, encoder_output = self.encoder_compute(
+            data, lengths, max_seg_len, device
+        )
+
+        # Compute the probability scores of segments of each length starting at
+        # each position using the embeddings and encoder outputs
+        segment_scores = self.decoder_compute(
+            seq_length, max_seg_len, batch_size, eoseg_index, data,
+            embedded_seq, encoder_output, device, range_by_length,
+            chars_to_subword_id
+        )
+
+        nn_time = time.time() - nn_start_time
+        lattice_start_time = time.time()
+
+        # Compute the best paths and loss(es) from the lattice
+        lattice_compute_tuple = self.lattice_compute(
+            lengths, max_seg_len, segment_scores, device, length_exponent,
+            length_penalty_lambda, calculate_length_expectation
+        )
+
+        lattice_time = time.time() - lattice_start_time
+
+        time_profile = {}
+        time_profile['nn'] = nn_time
+        time_profile['lattice'] = lattice_time
+
+        return (*lattice_compute_tuple, time_profile)
+
+    def encoder_compute(
+        self, data: Tensor, lengths: List[int], max_seg_len: int, device
+    ) -> Tuple[Tensor, Tensor]:
+        """
+        Compute the embeddings from data and pass them through the
+        encoder
+
+        Args:
+            data: The batch of input sequences
+            lengths: The list of the real (unpadded) lengths for each sequence
+            max_seg_len: The maximum segment length to be encoded
+            device: The PyTorch device to which to move the encoder
+
+        """
         # Embed the input batch
         embedded_seq = self.embedding(data)
 
@@ -205,7 +239,48 @@ class SegmentalLanguageModel(nn.Module):
             mask_type=self.mask_type,
             max_seg_len=max_seg_len
         )
-        
+
+        return embedded_seq, encoder_output
+
+    def decoder_compute(
+        self,
+        seq_length: int,
+        max_seg_len: int,
+        batch_size: int,
+        eoseg_index: int,
+        data: Tensor,
+        embedded_seq: Tensor,
+        encoder_output: Tensor,
+        device,
+        range_by_length: dict,
+        chars_to_subword_id: dict = None,
+    ) -> Tensor:
+        """
+        Prepare the decoder input, h and c from the encoder output and
+        embeddings and pass them through the decoder to obtain segment scores
+
+        Args:
+            seq_length: The length of the maximum padded input sequence
+            max_seg_len: The maximum segment length to be encoded
+            batch_size: The number of input sequences in each batch
+            eoseg_index: The index of the <eoseg> (end-of-segment) character
+            data: The batch of input sequences
+            embedded_seq: The embeddings of the input sequences
+            encoder_output: The output from the context encoder
+            device: The PyTorch device to which to move the segment scores
+            range_by_length: A mapping of segment length to range of positions
+                that can start the corresponding segment.
+            chars_to_subword_id: A mapping of character-index tuples to the
+                indices of the subword/segment they constitute. Default:
+                ``None``
+        """
+
+        loginf = 1000000.0
+        # Initialize the score for each possible segment to an approximation of
+        # infinity (log probability)
+        segment_scores = torch.empty(seq_length - 1, max_seg_len,
+                                     batch_size).fill_(-loginf).to(device)
+
         # Use the context encodings to create start symbols and initial hidden
         # states for the segment decoder, as well as the lexicon probabilities,
         # if it is being used
@@ -232,68 +307,19 @@ class SegmentalLanguageModel(nn.Module):
             start_symbols = all_start_symbols[range_start:range_end, :, :]
             h = all_h[range_start:range_end, :, :]
 
+            # Obtain the subword probability scores and lexical proportions if
+            # a lexicon is being used
             if self.use_lexicon:
-                # Get the subword logits for the current range and convert them
-                # probabilities with softmax. Shape is
-                # (num_seg_starts, batch_size, subword_vocab_size)
-                subword_logits = all_subword_probs[range_start:range_end, :, :]
-                base_logit_size = subword_logits.size(-1)
-                # Also get the lexical proportions for this range. Shape is
-                # (num_seg_starts, batch_size)
-                lexical_proportions = all_lex_proportions[
-                    range_start:range_end, :]
-
-                # Create the matrix of subword ids with which to index the
-                # logits, adding an additional index at the end for OOV
-                # subwords
-                subword_ids = np.zeros((num_seg_starts, batch_size, seg_len))
-                for i in range(num_seg_starts):
-                    real_i = i - range_start
-                    for j in range(batch_size):
-                        for k in range(seg_len):
-                            seg = data[real_i + 1:real_i + k + 2, j].tolist()
-                            seg = tuple(seg)
-                            if seg in chars_to_subword_id:
-                                subword_ids[i, j, k] = chars_to_subword_id[seg]
-                            else:
-                                subword_ids[i, j, k] = base_logit_size
-                subword_ids = (
-                    torch.tensor(subword_ids, dtype=torch.int64).to(device)
+                lexicon_decoder_dict = self.lexicon_decoder(
+                    all_subword_probs, all_lex_proportions, data,
+                    num_seg_starts, seg_len, batch_size, range_start, range_end,
+                    device, chars_to_subword_id
                 )
-
-                # Add negative infinity probs to the end of the logits to allow
-                # OOV subwords to not be a problem for torch.gather
-                oov_probs = torch.empty(
-                    (num_seg_starts, batch_size, 1)
-                ).fill_(-loginf).to(device)
-                subword_logits = torch.cat((subword_logits, oov_probs), dim=2)
-
-                # Gather the scores for the relevant subwords
-                subword_losses = torch.gather(
-                    subword_logits, dim=2, index=subword_ids
-                )
-
-                # Transpose the subword losses to be
-                # (seg_len, num_seg_starts, batch_size), allowing it to be added
-                # to the character scores later on
-                subword_losses = (
-                    subword_losses.transpose(1, 2).transpose(0, 1)
-                )
-
-                # Repeat the lexical mixture proportion to be the same for all
-                # segment lengths starting at the same position. It is now shape
-                # (seg_len, num_seg_starts, batch_size)
-                lexical_proportions = lexical_proportions.repeat(seg_len, 1, 1)
-                # Set the lexical mixture proportion to 0 where the given
-                # subword is OOV
-                zeroed_proportions = torch.zeros_like(lexical_proportions)
-                lexical_proportions = torch.where(
-                    subword_losses > -loginf, lexical_proportions,
-                    zeroed_proportions
-                )
-                # Set the character mixture proportion as 1 minus the lexical
-                # proportion
-                character_proportions = 1 - lexical_proportions
+                subword_losses = lexicon_decoder_dict['subword losses']
+                lexical_proportions = lexicon_decoder_dict['lexical proportions'
+                                                          ]
+                character_proportions = lexicon_decoder_dict[
+                    'character proportions']
 
             # Create a matrix of the 'masked' (original) segments to be fed to
             # the decoder, as well as the matrix of targets to compare against.
@@ -364,8 +390,38 @@ class SegmentalLanguageModel(nn.Module):
                     seg_probs = seg_probs + sw_probs
                 segment_scores[range_start:range_end, k, :] = seg_probs
 
-        nn_time = time.time() - nn_start_time
-        lattice_start_time = time.time()
+        return segment_scores
+
+    def lattice_compute(
+        self,
+        lengths: List[int],
+        max_seg_len: int,
+        segment_scores: Tensor,
+        device,
+        length_exponent: int = 2,
+        length_penalty_lambda: float = None,
+        calculate_length_expectation: bool = False
+    ):
+        """
+        Form a lattice over the batch sequences using the segment scores and use
+        it to obtain the best paths and loss(es)
+
+        Args:
+            lengths: The list of the real (unpadded) lengths for each sequence
+            max_seg_len: The maximum segment length to be encoded
+            segment_scores: The probability scores of segments of each length
+                starting at each position and ending with <eoseg>
+            device: The PyTorch device to which to move the lengths tensor
+            length_exponent: The exponent to which to raise each segment length
+                if expected length regularization is being used. Default: 2
+            length_penalty_lambda: The lambda used to control the strength of
+                the expected length penalty. If ``None``, expected length will
+                not be calculated at all. Default: ``None``
+            calculate_length_expectation: Boolean value denoting whether
+                expected length value is to be calculated. Default: ``False``
+        """
+
+        loginf = 1000000.0
 
         # For the sake of decoding, the sequence length will be the length
         # including <eos> but not <bos>.
@@ -395,9 +451,6 @@ class SegmentalLanguageModel(nn.Module):
         marginals = marginals / lengths_wo_bos_tensor
         best_paths, _ = lattice.best_path()
 
-        time_profile = {}
-        time_profile['nn'] = nn_time
-
         # If a length expectation penalty is being computed, combine it with the
         # main (bpc) loss, then return both the penalized and unpenalized loss,
         # along with the best paths. Otherwise, just return the main loss and
@@ -411,17 +464,109 @@ class SegmentalLanguageModel(nn.Module):
             total_loss = total_losses.mean()
             bpc_loss = marginals.mean().item()
 
-            lattice_time = time.time() - lattice_start_time
-            time_profile['lattice'] = lattice_time
-
-            return total_loss, bpc_loss, best_paths, time_profile
+            return total_loss, bpc_loss, best_paths
         else:
             total_loss = marginals.mean()
 
-            lattice_time = time.time() - lattice_start_time
-            time_profile['lattice'] = lattice_time
+            return total_loss, best_paths
 
-            return total_loss, best_paths, time_profile
+    def lexicon_decoder(
+        self,
+        all_subword_probs: Tensor,
+        all_lex_proportions: Tensor,
+        data: Tensor,
+        num_seg_starts: int,
+        seg_len: int,
+        batch_size: int,
+        range_start: int,
+        range_end: int,
+        device,
+        chars_to_subword_id: dict = None
+    ) -> Dict[str, int]:
+        """
+        If a lexicon is being used, use the lexicon probabilities to compute the
+        scores for the relevant subwords
+
+        Args:
+            all_subword_probs: The subword probabilities obtained via the
+                lexicon based on the encoder output
+            all_lex_proportions: The lexicon proportions obtained via the
+                lexicon based on the encoder output
+            data : The batch of input sequences
+            seg_len: The length of each segment
+            num_seg_starts : The number of segments into which the input
+                sequence can be broken down
+            batch_size: The number of input sequences in each batch
+            range_start: The starting position of the first segment with the
+                given segment length
+            range_end: The starting position of the final segment with the
+                given segment length
+            device: The PyTorch device to which to move the subword losses
+            chars_to_subword_id: A mapping of character-index tuples to the
+                indices of the subword/segment they constitute. Default:
+                ``None``
+        """
+
+        loginf = 1000000.0
+
+        # Get the subword logits for the current range and convert them
+        # probabilities with softmax. Shape is
+        # (num_seg_starts, batch_size, subword_vocab_size)
+        subword_logits = all_subword_probs[range_start:range_end, :, :]
+        base_logit_size = subword_logits.size(-1)
+        # Also get the lexical proportions for this range. Shape is
+        # (num_seg_starts, batch_size)
+        lexical_proportions = all_lex_proportions[range_start:range_end, :]
+
+        # Create the matrix of subword ids with which to index the
+        # logits, adding an additional index at the end for OOV
+        # subwords
+        subword_ids = np.zeros((num_seg_starts, batch_size, seg_len))
+        for i in range(num_seg_starts):
+            real_i = i - range_start
+            for j in range(batch_size):
+                for k in range(seg_len):
+                    seg = data[real_i + 1:real_i + k + 2, j].tolist()
+                    seg = tuple(seg)
+                    if seg in chars_to_subword_id:
+                        subword_ids[i, j, k] = chars_to_subword_id[seg]
+                    else:
+                        subword_ids[i, j, k] = base_logit_size
+        subword_ids = (torch.tensor(subword_ids, dtype=torch.int64).to(device))
+
+        # Add negative infinity probs to the end of the logits to allow
+        # OOV subwords to not be a problem for torch.gather
+        oov_probs = torch.empty((num_seg_starts, batch_size, 1)
+                               ).fill_(-loginf).to(device)
+        subword_logits = torch.cat((subword_logits, oov_probs), dim=2)
+
+        # Gather the scores for the relevant subwords
+        subword_losses = torch.gather(subword_logits, dim=2, index=subword_ids)
+
+        # Transpose the subword losses to be
+        # (seg_len, num_seg_starts, batch_size), allowing it to be added
+        # to the character scores later on
+        subword_losses = (subword_losses.transpose(1, 2).transpose(0, 1))
+
+        # Repeat the lexical mixture proportion to be the same for all
+        # segment lengths starting at the same position. It is now shape
+        # (seg_len, num_seg_starts, batch_size)
+        lexical_proportions = lexical_proportions.repeat(seg_len, 1, 1)
+        # Set the lexical mixture proportion to 0 where the given
+        # subword is OOV
+        zeroed_proportions = torch.zeros_like(lexical_proportions)
+        lexical_proportions = torch.where(
+            subword_losses > -loginf, lexical_proportions, zeroed_proportions
+        )
+        # Set the character mixture proportion as 1 minus the lexical
+        # proportion
+        character_proportions = 1 - lexical_proportions
+
+        return {
+            'subword losses': subword_losses,
+            'lexical proportions': lexical_proportions,
+            'character proportions': character_proportions
+        }
 
 
 class SLMEncoder(nn.Module):
@@ -451,7 +596,7 @@ class SLMEncoder(nn.Module):
             before the masked/unknown span
         max_seq_length: The absolute max sequence length expected to be encoded
             (used for sinusoidal positional encoding). Default: 4096
-        smart_position: Whether to learn the proportion with which to add the 
+        smart_position: Whether to learn the proportion with which to add the
             original and positional embeddings at each position. Adds a linear
             layer with ``2 * encoder_dim`` parameters. Default: ``False``
     """
@@ -474,6 +619,10 @@ class SLMEncoder(nn.Module):
         self.enc_type = enc_type
         self.autoencoder = autoencoder
         self.attention_window = attention_window
+        self.h_init_state = None
+        self.c_init_state = None
+        self.positional_emb_proportion = None
+        self.emb_scale_factor = None
 
         if self.attention_window:
             warnings.warn(
@@ -494,30 +643,23 @@ class SLMEncoder(nn.Module):
         # If the encoder is to be transformer-based, initialize the Positional
         # Encoding component and set the h and c state to None
         if self.enc_type == 'transformer':
-            
+
             # Register a static sinusoidal positional encoding, as well as an
             # optional feedforward layer to determine the relative strength of
             # the original and positional embeddings
-            pe = np.zeros((max_seq_length, encoder_dim))
-            for pos in range(max_seq_length):
-                for i in range(0, math.ceil(encoder_dim / 2)):
-                    pe[pos, 2 * i] = np.sin(pos / (10000 ** (2 * i / encoder_dim)))
-                    if 2 * i + 1 < encoder_dim:
-                        pe[pos, 2 * i + 1] = np.cos(pos / (10000 ** (2 * i / encoder_dim)))
-            model_dtype = self.input_to_enc_dim.weight.dtype
-            pe = torch.tensor(pe, dtype=model_dtype).unsqueeze(1)
+            pe = compute_positional_encoding(
+                d_model=encoder_dim, max_len=max_seq_length
+            )
             self.register_buffer('pe', pe)
+
             if smart_position:
-                self.positional_emb_proportion = nn.Linear(2 * encoder_dim, 1, bias=False)
+                self.positional_emb_proportion = nn.Linear(
+                    2 * encoder_dim, 1, bias=False
+                )
                 self.positional_emb_proportion.weight.data.fill_(0.0001)
-                self.emb_scale_factor = None
             else:
-                self.positional_emb_proportion = None
                 self.emb_scale_factor = nn.Parameter(torch.tensor([1.0]))
-            
-            self.h_init_state = None
-            self.c_init_state = None
-            
+
             # A transformer-based encoder has the additional option of being run
             # as an autoencoder (i.e. having no positions masked out). This is
             # not a language model in the traditional sense
@@ -540,13 +682,10 @@ class SLMEncoder(nn.Module):
                     ffwd_dim=ffwd_dim,
                     dropout=encoder_dropout
                 )
-        
+
         # If the encoder is to be lstm-based, initialize the h and c initial
         # states, also set the positional encoding to be None
         elif self.enc_type == 'lstm':
-            self.pos_encoder = None
-            self.positional_emb_proportion = None
-            self.emb_scale_factor = None
             self.h_init_state = nn.Parameter(
                 torch.zeros(num_enc_layers, 1, encoder_dim)
             )
@@ -588,59 +727,108 @@ class SLMEncoder(nn.Module):
         x = self.input_to_enc_dim(x)
 
         if self.enc_type == 'transformer':
-            # Create the padding mask
-            padding_mask = torch.zeros(batch_size, seq_len)
-            for seq in range(batch_size):
-                if lengths[seq] < seq_len:
-                    for pad in range(lengths[seq], seq_len):
-                        padding_mask[seq][pad] = 1
-            padding_mask = padding_mask.bool().to(device)
-
-            # Add the positional encoding to the embedding
-            pos_encoding = self.pe[:seq_len, :]
-            if self.positional_emb_proportion:
-                pos_encoding = pos_encoding.repeat(1, batch_size, 1)
-                concatenated_embedding = torch.cat((x, pos_encoding), dim=2)
-                emb_factor = 1.0 + torch.relu(
-                    self.positional_emb_proportion(concatenated_embedding)
-                )
-                scaled_embedding = emb_factor * x
-                pos_embedded_seq = scaled_embedding + pos_encoding
-            else:
-                pos_embedded_seq = (self.emb_scale_factor * x) + pos_encoding
-
-            # Apply dropout before feeding to the encoder
-            pos_embedded_seq = self.input_dropout(pos_embedded_seq)
-
-            # Run the input through the transformer block
-            if not self.autoencoder:
-                attn_mask = self.encoder.get_mask(
-                    seq_len,
-                    seg_len=max_seg_len,
-                    shape=mask_type,
-                    window=self.attention_window
-                ).to(device)
-                encoder_output = self.encoder(
-                    pos_embedded_seq,
-                    attn_mask=attn_mask,
-                    padding_mask=padding_mask
-                )
-            else:
-                encoder_output = self.encoder(
-                    pos_embedded_seq, src_key_padding_mask=padding_mask
-                )
+            encoder_output = self.encode_transformer(
+                x, lengths, seq_len, batch_size, device, mask_type, max_seg_len
+            )
         elif self.enc_type == 'lstm':
-            # Apply dropout before feeding to the encoder
-            x = self.input_dropout(x)
-            # Expand h and c to match the batch size, and run the input through
-            # the LSTM block
-            h = self.h_init_state.expand(-1, batch_size, -1).contiguous()
-            c = self.c_init_state.expand(-1, batch_size, -1).contiguous()
-            rnn_input = nn.utils.rnn.pack_padded_sequence(x, lengths)
-            encoder_output, _ = self.encoder(rnn_input, (h, c))
-            encoder_output, _ = nn.utils.rnn.pad_packed_sequence(encoder_output)
+            encoder_output = self.encode_lstm(x, lengths, batch_size)
         else:
             raise ValueError(f'Encoder type {self.enc_type} is not valid')
+
+        return encoder_output
+
+    def encode_transformer(
+        self,
+        x: Tensor,
+        lengths: List[int],
+        seq_len: int,
+        batch_size: int,
+        device,
+        mask_type: str = 'cloze',
+        max_seg_len: int = 1
+    ) -> Tensor:
+        """
+        Encode the language modeling context for each position in the input
+        sequences using the transformer encoder
+
+        Args:
+            x: The embedded input batch of sequences passed through a linear
+                layer
+            lengths: The list of the real (unpadded) lengths for each sequence
+            seq_len: The length of the maximum padded input sequence
+            batch_size: The number of input sequences in each batch
+            device: The PyTorch device to which to move the mask
+            mask_type: The type of attention mask to use with a transformer
+                encoder. Default: ``cloze``
+            max_seg_len: The maximum segment length to be encoded. Default: 1
+
+        """
+        # Create the padding mask
+        padding_mask = torch.zeros(batch_size, seq_len)
+        for seq in range(batch_size):
+            if lengths[seq] < seq_len:
+                for pad in range(lengths[seq], seq_len):
+                    padding_mask[seq][pad] = 1
+        padding_mask = padding_mask.bool().to(device)
+
+        # Add the positional encoding to the embedding
+        pos_encoding = self.pe[:seq_len, :]
+        if self.positional_emb_proportion:
+            pos_encoding = pos_encoding.repeat(1, batch_size, 1)
+            concatenated_embedding = torch.cat((x, pos_encoding), dim=2)
+            emb_factor = 1.0 + torch.relu(
+                self.positional_emb_proportion(concatenated_embedding)
+            )
+            scaled_embedding = emb_factor * x
+            pos_embedded_seq = scaled_embedding + pos_encoding
+        else:
+            pos_embedded_seq = (self.emb_scale_factor * x) + pos_encoding
+
+        # Apply dropout before feeding to the encoder
+        pos_embedded_seq = self.input_dropout(pos_embedded_seq)
+
+        # Run the input through the transformer block
+        if not self.autoencoder:
+            attn_mask = self.encoder.get_mask(
+                seq_len,
+                seg_len=max_seg_len,
+                shape=mask_type,
+                window=self.attention_window
+            ).to(device)
+            encoder_output = self.encoder(
+                pos_embedded_seq,
+                attn_mask=attn_mask,
+                padding_mask=padding_mask
+            )
+        else:
+            encoder_output = self.encoder(
+                pos_embedded_seq, src_key_padding_mask=padding_mask
+            )
+
+        return encoder_output
+
+    def encode_lstm(
+        self, x: Tensor, lengths: List[int], batch_size: int
+    ) -> Tensor:
+        """
+        Encode the language modeling context for each position in the input
+        sequences using the LSTM encoder
+
+        Args:
+            x: The embedded input batch of sequences passed through a linear
+                layer
+            lengths: The list of the real (unpadded) lengths for each sequence
+            batch_size: The number of input sequences in each batch
+        """
+        # Apply dropout before feeding to the encoder
+        x = self.input_dropout(x)
+        # Expand h and c to match the batch size, and run the input through
+        # the LSTM block
+        h = self.h_init_state.expand(-1, batch_size, -1).contiguous()
+        c = self.c_init_state.expand(-1, batch_size, -1).contiguous()
+        rnn_input = nn.utils.rnn.pack_padded_sequence(x, lengths)
+        encoder_output, _ = self.encoder(rnn_input, (h, c))
+        encoder_output, _ = nn.utils.rnn.pad_packed_sequence(encoder_output)
 
         return encoder_output
 
