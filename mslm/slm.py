@@ -212,7 +212,7 @@ class SegmentalLanguageModel(nn.Module):
         time_profile['nn'] = nn_time
         time_profile['lattice'] = lattice_time
 
-        return *lattice_compute_tuple, time_profile
+        return (*lattice_compute_tuple, time_profile)
 
     def encoder_compute(
         self, data: Tensor, lengths: List[int], max_seg_len: int, device
@@ -316,7 +316,8 @@ class SegmentalLanguageModel(nn.Module):
                     device, chars_to_subword_id
                 )
                 subword_losses = lexicon_decoder_dict['subword losses']
-                lexical_proportions = lexicon_decoder_dict['lexical proportions']
+                lexical_proportions = lexicon_decoder_dict['lexical proportions'
+                                                          ]
                 character_proportions = lexicon_decoder_dict[
                     'character proportions']
 
