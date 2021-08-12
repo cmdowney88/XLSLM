@@ -204,7 +204,7 @@ class SubsequentSpanEncoder(TransformerEncoderLayer):
         return enc
 
 
-def computePositionalEncoding(d_model: int, max_len: int = 5000) -> Tensor:
+def compute_positional_encoding(d_model: int, max_len: int = 5000) -> Tensor:
     """
     Static sinusoidal positional embeddings to be added to the input to a
     transformer

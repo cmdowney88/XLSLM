@@ -7,7 +7,6 @@ Authors:
     C.M. Downey (cmdowney@uw.edu)
     Shivin Thukral (shivin7@uw.edu)
 """
-import math
 import time
 import warnings
 from typing import List, Tuple, Dict
@@ -22,7 +21,7 @@ from torch.nn.modules.transformer import (
 )
 
 from .lattice import AcyclicLattice
-from .segmental_transformer import SegmentalTransformerEncoder, computePositionalEncoding
+from .segmental_transformer import SegmentalTransformerEncoder, compute_positional_encoding
 
 
 class SegmentalLanguageModel(nn.Module):
@@ -202,7 +201,7 @@ class SegmentalLanguageModel(nn.Module):
         lattice_start_time = time.time()
 
         # Compute the best paths and loss(es) from the lattice
-        latticeComputeTuple = self.lattice_compute(
+        lattice_compute_tuple = self.lattice_compute(
             lengths, max_seg_len, segment_scores, device, length_exponent,
             length_penalty_lambda, calculate_length_expectation
         )
@@ -213,7 +212,7 @@ class SegmentalLanguageModel(nn.Module):
         time_profile['nn'] = nn_time
         time_profile['lattice'] = lattice_time
 
-        return *latticeComputeTuple, time_profile
+        return *lattice_compute_tuple, time_profile
 
     def encoder_compute(
         self, data: Tensor, lengths: List[int], max_seg_len: int, device
@@ -311,14 +310,14 @@ class SegmentalLanguageModel(nn.Module):
             # Obtain the subword probability scores and lexical proportions if
             # a lexicon is being used
             if self.use_lexicon:
-                lexiconDecoderDict = self.lexicon_decoder(
+                lexicon_decoder_dict = self.lexicon_decoder(
                     all_subword_probs, all_lex_proportions, data,
                     num_seg_starts, seg_len, batch_size, range_start, range_end,
                     device, chars_to_subword_id
                 )
-                subword_losses = lexiconDecoderDict['subword losses']
-                lexical_proportions = lexiconDecoderDict['lexical proportions']
-                character_proportions = lexiconDecoderDict[
+                subword_losses = lexicon_decoder_dict['subword losses']
+                lexical_proportions = lexicon_decoder_dict['lexical proportions']
+                character_proportions = lexicon_decoder_dict[
                     'character proportions']
 
             # Create a matrix of the 'masked' (original) segments to be fed to
@@ -647,7 +646,7 @@ class SLMEncoder(nn.Module):
             # Register a static sinusoidal positional encoding, as well as an
             # optional feedforward layer to determine the relative strength of
             # the original and positional embeddings
-            pe = computePositionalEncoding(
+            pe = compute_positional_encoding(
                 d_model=encoder_dim, max_len=max_seq_length
             )
             self.register_buffer('pe', pe)
