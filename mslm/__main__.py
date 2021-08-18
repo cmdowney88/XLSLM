@@ -75,6 +75,10 @@ def import_or_create_subword_vocab(
     if subword_vocab_file:
         with open(subword_vocab_file, 'r') as f:
             id_to_subword = yaml.load(f, Loader=yaml.SafeLoader)
+            id_to_subword = {
+                key: tuple(value)
+                for key, value in id_to_subword.items()
+            }
         subword_to_id = {}
         for index in id_to_subword.keys():
             subword_to_id[id_to_subword[index]] = index
@@ -93,6 +97,10 @@ def import_or_create_subword_vocab(
         next_index = len(subword_to_id)
         subword_to_id[('<eos>', )] = next_index
         id_to_subword[next_index] = ('<eos>', )
+        id_to_subword = {
+            key: list(value)
+            for key, value in id_to_subword.items()
+        }
         subword_vocab_file = model_path + '_subword_vocab.yaml'
         with open(subword_vocab_file, 'w') as f:
             yaml.dump(id_to_subword, f)
