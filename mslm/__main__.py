@@ -268,6 +268,81 @@ def statbar_string(stat_dict: dict) -> str:
     return ' | '.join(stat_items)
 
 
+def dev_file_load(
+    file_list: List[str], config: dict, vocab: wr.Vocab, pad_idx: int
+) -> Dict:
+    """
+    Create a DataLoader and gold segmentations for the dev file(s)
+
+    Args:
+        file_list: The list of dev files
+        config: The configuration file for training
+        vocab: The vocabulary created from the training text
+        pad_idx: The index for the <pad> token
+    """
+    # Tokenize the dev file by characters, adding <bos> and <eos> tags.
+    # Convert text to integer ids based on Vocab, and read into Dataset and
+    # Dataloader
+    dev_texts = []
+    for d_file in file_list:
+        d_text = wr.character_tokenize(
+            d_file, preserve_case=config.preserve_case, edge_tokens=True
+        )
+        dev_texts.append(d_text)
+
+    dev_datas = []
+    for d_text in dev_texts:
+        d_data = [vocab.to_ids(line) for line in d_text]
+        dev_datas.append(d_data)
+
+    dev_sets = []
+    for d_data in dev_datas:
+        d_set = VariableLengthDataset(
+            d_data,
+            batch_size=config.batch_size,
+            pad_value=pad_idx,
+            batch_by=config.batch_by,
+            max_padding=config.max_padding,
+            max_pad_strategy='split'
+        )
+        dev_sets.append(d_set)
+
+    dev_dataloaders = []
+    for d_set in dev_sets:
+        d_dataloader = DataLoader(d_set, batch_size=None)
+        dev_dataloaders.append(d_dataloader)
+
+    gold_dev_texts = []
+    gold_boundaries = []
+    all_gold_boundaries = []
+
+    # Also whitespace-tokenize the dev data, using the spaces to establish
+    # gold-standard segmentations for the dev data, which are converted to a
+    # binary "boundary" vector using get_boundary_vector
+    for d_file in file_list:
+        counter = 0
+        gold_d_text = [
+            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+                d_file, preserve_case=config.preserve_case, split_tags=True
+            )
+        ]
+        gold_d_text = gold_d_text[:dev_sets[counter].total_num_instances]
+        gold_dev_texts.append(gold_d_text)
+
+        g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
+        gold_boundaries.append(g_boundaries)
+
+        all_g_boundaries = np.array(wr.flatten(g_boundaries))
+        all_gold_boundaries.append(all_g_boundaries)
+        counter += 1
+
+    return {
+        'data_loaders': dev_dataloaders,
+        'gold_boundaries': all_gold_boundaries,
+        'unsort_permutation': [dev_set.unsort_pmt for dev_set in dev_sets]
+    }
+
+
 # ------------------------------------------------------------------------------
 # Train and Predict Functions
 # ------------------------------------------------------------------------------
@@ -355,240 +430,51 @@ def train(args, config, dev_config, device, logger) -> None:
         train_set, batch_size=None, sampler=random_sampler
     )
 
-    # Tokenize the dev file by characters, adding <bos> and <eos>
-    # tags. Convert text to integer ids based on Vocab, and read into Dataset and
-    # Dataloader
+    # dev file using command line argument
     if args.dev_file:
-        dev_text = wr.character_tokenize(
-            args.dev_file, preserve_case=config.preserve_case, edge_tokens=True
-        )
-        dev_data = [vocab.to_ids(line) for line in dev_text]
-        dev_set = VariableLengthDataset(
-            dev_data,
-            batch_size=config.batch_size,
-            pad_value=pad_idx,
-            batch_by=config.batch_by,
-            max_padding=config.max_padding,
-            max_pad_strategy='split'
-        )
-        dev_dataloader = DataLoader(dev_set, batch_size=None)
-
-        # Also whitespace-tokenize the dev data, using the spaces to establish
-        # gold-standard segmentations for the dev data, which are converted to a
-        # binary "boundary" vector using get_boundary_vector
-        gold_dev_text = [
-            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                args.dev_file,
-                preserve_case=config.preserve_case,
-                split_tags=True
-            )
-        ]
-        gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
-        gold_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
-        all_gold_boundaries = np.array(wr.flatten(gold_boundaries))
-
+        dev_load_dict = dev_file_load([args.dev_file], config, vocab, pad_idx)
+        dev_dataloader = dev_load_dict['data_loaders'][0]
+        all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
+        dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
+    #primary dev file in dev_config
     elif args.dev_config:
-        #primary dev file
-        dev_text = wr.character_tokenize(
-            dev_config.primary_dev_file,
-            preserve_case=config.preserve_case,
-            edge_tokens=True
+        dev_load_dict = dev_file_load(
+            [dev_config.primary_dev_file], config, vocab, pad_idx
         )
-        dev_data = [vocab.to_ids(line) for line in dev_text]
-        dev_set = VariableLengthDataset(
-            dev_data,
-            batch_size=config.batch_size,
-            pad_value=pad_idx,
-            batch_by=config.batch_by,
-            max_padding=config.max_padding,
-            max_pad_strategy='split'
-        )
-        dev_dataloader = DataLoader(dev_set, batch_size=None)
-
-        # Also whitespace-tokenize the dev data, using the spaces to establish
-        # gold-standard segmentations for the dev data, which are converted to a
-        # binary "boundary" vector using get_boundary_vector
-        gold_dev_text = [
-            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                dev_config.primary_dev_file,
-                preserve_case=config.preserve_case,
-                split_tags=True
-            )
-        ]
-        gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
-        gold_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
-        all_gold_boundaries = np.array(wr.flatten(gold_boundaries))
+        dev_dataloader = dev_load_dict['data_loaders'][0]
+        all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
+        dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
 
         #bpc mode secondary dev files
         if dev_config.bpc_secondary_dev_files:
-            bpc_secondary_dev_texts = []
-            for d_file in dev_config.bpc_secondary_dev_files:
-                d_text = wr.character_tokenize(
-                    d_file,
-                    preserve_case=config.preserve_case,
-                    edge_tokens=True
-                )
-                bpc_secondary_dev_texts.append(d_text)
-
-            bpc_secondary_dev_datas = []
-            for d_text in bpc_secondary_dev_texts:
-                d_data = [vocab.to_ids(line) for line in d_text]
-                bpc_secondary_dev_datas.append(d_data)
-
-            bpc_secondary_dev_sets = []
-            for d_data in bpc_secondary_dev_datas:
-                d_set = VariableLengthDataset(
-                    d_data,
-                    batch_size=config.batch_size,
-                    pad_value=pad_idx,
-                    batch_by=config.batch_by,
-                    max_padding=config.max_padding,
-                    max_pad_strategy='split'
-                )
-                bpc_secondary_dev_sets.append(d_set)
-
-            bpc_secondary_dev_dataloaders = []
-            for d_set in bpc_secondary_dev_sets:
-                d_dataloader = DataLoader(d_set, batch_size=None)
-                bpc_secondary_dev_dataloaders.append(d_dataloader)
-
-            bpc_secondary_gold_dev_texts = []
-            bpc_secondary_gold_boundaries = []
-            bpc_secondary_all_gold_boundaries = []
-
-            for d_file in dev_config.bpc_secondary_dev_files:
-                counter = 0
-                gold_d_text = [
-                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                        d_file,
-                        preserve_case=config.preserve_case,
-                        split_tags=True
-                    )
-                ]
-                gold_d_text = gold_d_text[:bpc_secondary_dev_sets[counter].
-                                          total_num_instances]
-                bpc_secondary_gold_dev_texts.append(gold_d_text)
-
-                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
-                bpc_secondary_gold_boundaries.append(g_boundaries)
-
-                all_g_boundaries = np.array(wr.flatten(g_boundaries))
-                bpc_secondary_all_gold_boundaries.append(all_g_boundaries)
-                counter += 1
+            dev_load_dict = dev_file_load(
+                dev_config.bpc_secondary_dev_files, config, vocab, pad_idx
+            )
+            bpc_secondary_dev_dataloaders = dev_load_dict['data_loaders']
+            bpc_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries']
+            bpc_secondary_dev_set_unsort_pmt = dev_load_dict[
+                'unsort_permutation']
 
         #seg qual mode secondary dev files
         if dev_config.seg_secondary_dev_files:
-            seg_secondary_dev_texts = []
-            for d_file in dev_config.seg_secondary_dev_files:
-                d_text = wr.character_tokenize(
-                    d_file,
-                    preserve_case=config.preserve_case,
-                    edge_tokens=True
-                )
-                seg_secondary_dev_texts.append(d_text)
-
-            seg_secondary_dev_datas = []
-            for d_text in seg_secondary_dev_texts:
-                d_data = [vocab.to_ids(line) for line in d_text]
-                seg_secondary_dev_datas.append(d_data)
-
-            seg_secondary_dev_sets = []
-            for d_data in seg_secondary_dev_datas:
-                d_set = VariableLengthDataset(
-                    d_data,
-                    batch_size=config.batch_size,
-                    pad_value=pad_idx,
-                    batch_by=config.batch_by,
-                    max_padding=config.max_padding,
-                    max_pad_strategy='split'
-                )
-                seg_secondary_dev_sets.append(d_set)
-
-            seg_secondary_dev_dataloaders = []
-            for d_set in seg_secondary_dev_sets:
-                d_dataloader = DataLoader(d_set, batch_size=None)
-                seg_secondary_dev_dataloaders.append(d_dataloader)
-
-            seg_secondary_gold_dev_texts = []
-            seg_secondary_gold_boundaries = []
-            seg_secondary_all_gold_boundaries = []
-
-            for d_file in dev_config.seg_secondary_dev_files:
-                counter = 0
-                gold_d_text = [
-                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                        d_file,
-                        preserve_case=config.preserve_case,
-                        split_tags=True
-                    )
-                ]
-                gold_d_text = gold_d_text[:seg_secondary_dev_sets[counter].
-                                          total_num_instances]
-                seg_secondary_gold_dev_texts.append(gold_d_text)
-
-                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
-                seg_secondary_gold_boundaries.append(g_boundaries)
-
-                all_g_boundaries = np.array(wr.flatten(g_boundaries))
-                seg_secondary_all_gold_boundaries.append(all_g_boundaries)
-                counter += 1
+            dev_load_dict = dev_file_load(
+                dev_config.seg_secondary_dev_files, config, vocab, pad_idx
+            )
+            seg_secondary_dev_dataloaders = dev_load_dict['data_loaders']
+            seg_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries']
+            seg_secondary_dev_set_unsort_pmt = dev_load_dict[
+                'unsort_permutation']
 
         #both mode secondary dev files
         if dev_config.both_secondary_dev_files:
-            both_secondary_dev_texts = []
-            for d_file in dev_config.both_secondary_dev_files:
-                d_text = wr.character_tokenize(
-                    d_file,
-                    preserve_case=config.preserve_case,
-                    edge_tokens=True
-                )
-                both_secondary_dev_texts.append(d_text)
-
-            both_secondary_dev_datas = []
-            for d_text in both_secondary_dev_texts:
-                d_data = [vocab.to_ids(line) for line in d_text]
-                both_secondary_dev_datas.append(d_data)
-
-            both_secondary_dev_sets = []
-            for d_data in both_secondary_dev_datas:
-                d_set = VariableLengthDataset(
-                    d_data,
-                    batch_size=config.batch_size,
-                    pad_value=pad_idx,
-                    batch_by=config.batch_by,
-                    max_padding=config.max_padding,
-                    max_pad_strategy='split'
-                )
-                both_secondary_dev_sets.append(d_set)
-
-            both_secondary_dev_dataloaders = []
-            for d_set in both_secondary_dev_sets:
-                d_dataloader = DataLoader(d_set, batch_size=None)
-                both_secondary_dev_dataloaders.append(d_dataloader)
-
-            both_secondary_gold_dev_texts = []
-            both_secondary_gold_boundaries = []
-            both_secondary_all_gold_boundaries = []
-
-            for d_file in dev_config.both_secondary_dev_files:
-                counter = 0
-                gold_d_text = [
-                    wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                        d_file,
-                        preserve_case=config.preserve_case,
-                        split_tags=True
-                    )
-                ]
-                gold_d_text = gold_d_text[:both_secondary_dev_sets[counter].
-                                          total_num_instances]
-                both_secondary_gold_dev_texts.append(gold_d_text)
-
-                g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
-                both_secondary_gold_boundaries.append(g_boundaries)
-
-                all_g_boundaries = np.array(wr.flatten(g_boundaries))
-                both_secondary_all_gold_boundaries.append(all_g_boundaries)
-                counter += 1
+            dev_load_dict = dev_file_load(
+                dev_config.both_secondary_dev_files, config, vocab, pad_idx
+            )
+            both_secondary_dev_dataloaders = dev_load_dict['data_loaders']
+            both_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries'
+                                                              ]
+            both_secondary_dev_set_unsort_pmt = dev_load_dict[
+                'unsort_permutation']
 
     # If training an existing model, read it from the checkpoint and load in the
     # parameters, else create a new model instantiation based on the input
@@ -729,7 +615,7 @@ def train(args, config, dev_config, device, logger) -> None:
             'chars_to_subword_id': char_ids_to_subword_id,
             'vocab': vocab,
             'gold_boundaries': all_gold_boundaries,
-            'unsort_permutation': dev_set.unsort_pmt,
+            'unsort_permutation': dev_set_unsort_pmt,
             'clear_cache_by_batch': config.clear_cache_by_batch
         }
 
@@ -744,7 +630,7 @@ def train(args, config, dev_config, device, logger) -> None:
             'chars_to_subword_id': char_ids_to_subword_id,
             'vocab': vocab,
             'gold_boundaries': all_gold_boundaries,
-            'unsort_permutation': dev_set.unsort_pmt,
+            'unsort_permutation': dev_set_unsort_pmt,
             'clear_cache_by_batch': config.clear_cache_by_batch
         }
 
@@ -761,7 +647,7 @@ def train(args, config, dev_config, device, logger) -> None:
                     'chars_to_subword_id': char_ids_to_subword_id,
                     'vocab': vocab,
                     'gold_boundaries': bpc_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': bpc_secondary_dev_sets[i].unsort_pmt,
+                    'unsort_permutation': bpc_secondary_dev_set_unsort_pmt[i],
                     'clear_cache_by_batch': config.clear_cache_by_batch
                 }
                 list_of_bpc_secondary_eval_args.append(bpc_secondary_eval_args)
@@ -779,7 +665,7 @@ def train(args, config, dev_config, device, logger) -> None:
                     'chars_to_subword_id': char_ids_to_subword_id,
                     'vocab': vocab,
                     'gold_boundaries': seg_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': seg_secondary_dev_sets[i].unsort_pmt,
+                    'unsort_permutation': seg_secondary_dev_set_unsort_pmt[i],
                     'clear_cache_by_batch': config.clear_cache_by_batch
                 }
                 list_of_seg_secondary_eval_args.append(seg_secondary_eval_args)
@@ -797,7 +683,7 @@ def train(args, config, dev_config, device, logger) -> None:
                     'chars_to_subword_id': char_ids_to_subword_id,
                     'vocab': vocab,
                     'gold_boundaries': both_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': both_secondary_dev_sets[i].unsort_pmt,
+                    'unsort_permutation': both_secondary_dev_set_unsort_pmt[i],
                     'clear_cache_by_batch': config.clear_cache_by_batch
                 }
                 list_of_both_secondary_eval_args.append(
