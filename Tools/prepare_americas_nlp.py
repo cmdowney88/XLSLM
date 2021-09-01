@@ -16,6 +16,19 @@ same name that they do in the AmericasNLP repository, for example, 'dev.cni')
 import sys
 from typing import List
 
+URL_SUBSTRINGS = ['www.', 'http', '.com', '.org', '.net', '.co']
+
+
+def line_is_clean(line: str) -> bool:
+    """
+    Return whether the line is clean (doesn't have a url, doesn't have a
+    copyright symbol, has at least one alphabetic character)
+    """
+    no_url = all(sub not in line for sub in URL_SUBSTRINGS)
+    no_copyright = ('©' not in line)
+    has_alpha = any(c.isalpha() for c in line)
+    return no_url and no_copyright and has_alpha
+
 
 def prepare(filename: str) -> List[str]:
     """
@@ -32,9 +45,7 @@ def prepare(filename: str) -> List[str]:
     lines[:] = [x for x in lines if x]
 
     # remove lines with urls and copyright symbols
-    prepared = [
-        line for line in lines if 'www.' not in line and '©' not in line
-    ]
+    prepared = [line for line in lines if line_is_clean(line)]
 
     return prepared
 
