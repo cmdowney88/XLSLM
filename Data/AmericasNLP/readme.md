@@ -34,14 +34,14 @@ languages. The original parallel Spanish sentences have been omitted
 
 | Language | File | Lines | Total Tokens | Unique Tokens | Total Characters | Unique Characters | Mean Token Length |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| All | train.anlp | 225,940 | 2,376,833 | 347,881| 16,786,932 | 253 | 7.06 |
+| All | train.anlp | 223,117 | 2,368,505 | 347,438| 16,757,586 | 252 | 7.08 |
 | Asháninka | train.cni | 3,883 | 26,096 | 12,490 | 232,494 | 65 | 8.91 |
-| Aymara | train.aym | 6,525 | 97,210 | 33,879 | 630,972 | 157 | 6.49 |
+| Aymara | train.aym | 6,424 | 96,075 | 33,590 | 624,608 | 156 | 6.50 |
 | Bribri | train.bzd | 7,508 | 41,141 | 7,858 | 167,531 | 65 | 4.07 |
-| Guaraní | train.gug | 26,009 | 405,548 | 44,787 | 2,719,226 | 120 | 6.71 |
+| Guaraní | train.gug | 26,002 | 405,449 | 44,763 | 2,718,442 | 120 | 6.70 |
 | Hñähñu | train.oto | 4,889 | 72,280 | 8,664 | 275,696 | 90 | 3.81 |
-| Nahuatl | train.nah | 16,063 | 351,709 | 53,743 | 1,984,693 | 102 | 5.64 |
-| Quechua | train.quy | 122,803 | 1,167,390 | 146,080 | 9,647,783 | 115 | 8.26 |
+| Nahuatl | train.nah | 16,061 | 351,703 | 53,743 | 1,984,687 | 102 | 5.64 |
+| Quechua | train.quy | 120,090 | 1,160,302 | 145,914 | 9,625,591 | 114 | 8.30 |
 | Rarámuri | train.tar | 14,720 | 103,745 | 15,691 | 398,898 | 74 | 3.84 |
 | Shipibo Konibo | train.shp | 14,592 | 62,850 | 17,642 | 397,510 | 56 | 6.32 |
 | Wixarika | train.hch | 8,948 | 48,864 | 17,357 | 332,129 | 67 | 6.80 |
