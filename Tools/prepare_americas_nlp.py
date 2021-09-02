@@ -13,6 +13,7 @@ file, which will have all the prepared lines from each of the dev files/each of
 the train files given as command line arguments (and assumes files will have the
 same name that they do in the AmericasNLP repository, for example, 'dev.cni') 
 """
+import os
 import sys
 from typing import List
 
@@ -79,11 +80,11 @@ def main():
     # get list of files
     list_of_files = sys.argv[1:]
     dev_files = [filename for filename in list_of_files if 'dev' in filename]
-    dev_files.sort()
+    dev_files.sort(key=lambda x: os.path.splitext(x)[1])
     train_files = [
         filename for filename in list_of_files if 'train' in filename
     ]
-    train_files.sort()
+    train_files.sort(key=lambda x: os.path.splitext(x)[1])
 
     # to store lists of prepared lines for the combined dev file and the
     # combined train file
