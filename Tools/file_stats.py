@@ -157,7 +157,7 @@ def main():
     """
     # get names of files to find stats for
     list_of_files = sys.argv[1:]
-    list_of_files.sort(key=lambda x: os.path.splitext(x)[1])
+    list_of_files.sort(key=lambda x: os.path.splitext(x)[-1])
 
     # list to store all of the stats dicts to output to combined file
     list_of_stats = []
