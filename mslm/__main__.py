@@ -554,55 +554,58 @@ def train(args, config, dev_config, device, logger) -> None:
     )
 
     # Write the metric field headers to the output csv file(s)
-    metrics = [
-        "step", "s/batch", "lr", "train_loss", "dev_loss", "mcc", "f1",
-        "precision", "recall"
-    ]
-    bpc_metrics = [
-        "step", "s/batch", "lr", "train_loss", "dev_loss", "precision", "recall"
-    ]
-    seg_metrics = [
-        "step", "s/batch", "lr", "train_loss", "mcc", "f1", "precision",
-        "recall"
-    ]
+    fixed_metrics = ["step", "s/batch", "lr", "train_loss"]
+    all_metrics = ["dev_loss", "mcc", "f1", "precision", "recall"]
+    bpc_metrics = ["dev_loss", "precision", "recall"]
+    seg_metrics = ["mcc", "f1", "precision", "recall"]
+    metric_file_headers = []
 
     if args.dev_file:
-        with open(args.model_path + '.csv', 'w+') as data_file:
-            print(', '.join(metrics), file=data_file)
+        metric_file_headers = [
+            os.path.basename(args.dev_file) + '_' + metric
+            for metric in all_metrics
+        ]
     elif args.dev_config:
         if dev_config.primary_dev_mode == 'bpc':
-            with open(args.model_path + '.csv', 'w+') as data_file:
-                print(', '.join(bpc_metrics), file=data_file)
+            metric_file_headers += [
+                os.path.basename(dev_config.primary_dev_file) + '_' + metric
+                for metric in bpc_metrics
+            ]
         elif dev_config.primary_dev_mode == 'seg':
-            with open(args.model_path + '.csv', 'w+') as data_file:
-                print(', '.join(seg_metrics), file=data_file)
+            metric_file_headers += [
+                os.path.basename(dev_config.primary_dev_file) + '_' + metric
+                for metric in seg_metrics
+            ]
         elif dev_config.primary_dev_mode == 'both':
-            with open(args.model_path + '.csv', 'w+') as data_file:
-                print(', '.join(metrics), file=data_file)
+            metric_file_headers += [
+                os.path.basename(dev_config.primary_dev_file) + '_' + metric
+                for metric in all_metrics
+            ]
 
         if dev_config.bpc_secondary_dev_files:
             for d_file in dev_config.bpc_secondary_dev_files:
-                with open(
-                    args.model_path + '_' + d_file.replace('/', '_') + '.csv',
-                    'w+'
-                ) as data_file:
-                    print(', '.join(bpc_metrics), file=data_file)
+                metric_file_headers += [
+                    os.path.basename(d_file) + '_' + metric
+                    for metric in bpc_metrics
+                ]
 
         if dev_config.seg_secondary_dev_files:
             for d_file in dev_config.seg_secondary_dev_files:
-                with open(
-                    args.model_path + '_' + d_file.replace('/', '_') + '.csv',
-                    'w+'
-                ) as data_file:
-                    print(', '.join(seg_metrics), file=data_file)
+                metric_file_headers += [
+                    os.path.basename(d_file) + '_' + metric
+                    for metric in seg_metrics
+                ]
 
         if dev_config.both_secondary_dev_files:
             for d_file in dev_config.both_secondary_dev_files:
-                with open(
-                    args.model_path + '_' + d_file.replace('/', '_') + '.csv',
-                    'w+'
-                ) as data_file:
-                    print(', '.join(metrics), file=data_file)
+                metric_file_headers += [
+                    os.path.basename(d_file) + '_' + metric
+                    for metric in all_metrics
+                ]
+
+    metric_file_headers = fixed_metrics + metric_file_headers
+    with open(args.model_path + '.csv', 'w+') as data_file:
+        print(', '.join(metric_file_headers), file=data_file)
 
     #Make eval_args
     if args.dev_file:
@@ -717,6 +720,12 @@ def train(args, config, dev_config, device, logger) -> None:
         # At the very beginning of training, do an eval run and record baseline
         # metrics, writing to the output metric file
         if global_step == 0:
+            metrics_list = [
+                str(metric) for metric in [
+                    global_step, "n/a",
+                    round(scheduler.get_last_lr()[0], 7), "n/a"
+                ]
+            ]
             if args.dev_file:
                 with torch.no_grad():
                     dev_stat_dict, dev_segmentations = do_eval(**eval_args)
@@ -731,15 +740,11 @@ def train(args, config, dev_config, device, logger) -> None:
                     )
 
                 metrics = [
-                    global_step, "n/a",
-                    round(scheduler.get_last_lr()[0],
-                          7), "n/a", dev_stat_dict['dev loss'],
-                    dev_stat_dict['mcc'], dev_stat_dict['f1'],
-                    dev_stat_dict['precision'], dev_stat_dict['recall']
+                    dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
+                    dev_stat_dict['f1'], dev_stat_dict['precision'],
+                    dev_stat_dict['recall']
                 ]
-                metrics = [str(m) for m in metrics]
-                with open(args.model_path + '.csv', 'a+') as data_file:
-                    print(', '.join(metrics), file=data_file)
+                metrics_list += [str(m) for m in metrics]
 
             elif args.dev_config:
                 if dev_config.primary_dev_mode == 'bpc':
@@ -756,14 +761,10 @@ def train(args, config, dev_config, device, logger) -> None:
                         )
 
                     metrics = [
-                        global_step, "n/a",
-                        round(scheduler.get_last_lr()[0],
-                              7), "n/a", dev_stat_dict['dev loss'],
-                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                        dev_stat_dict['dev loss'], dev_stat_dict['precision'],
+                        dev_stat_dict['recall']
                     ]
-                    metrics = [str(m) for m in metrics]
-                    with open(args.model_path + '.csv', 'a+') as data_file:
-                        print(', '.join(metrics), file=data_file)
+                    metrics_list += [str(m) for m in metrics]
 
                 elif dev_config.primary_dev_mode == 'seg':
                     with torch.no_grad():
@@ -779,14 +780,10 @@ def train(args, config, dev_config, device, logger) -> None:
                         )
 
                     metrics = [
-                        global_step, "n/a",
-                        round(scheduler.get_last_lr()[0], 7), "n/a",
                         dev_stat_dict['mcc'], dev_stat_dict['f1'],
                         dev_stat_dict['precision'], dev_stat_dict['recall']
                     ]
-                    metrics = [str(m) for m in metrics]
-                    with open(args.model_path + '.csv', 'a+') as data_file:
-                        print(', '.join(metrics), file=data_file)
+                    metrics_list += [str(m) for m in metrics]
 
                 elif dev_config.primary_dev_mode == 'both':
                     with torch.no_grad():
@@ -802,15 +799,11 @@ def train(args, config, dev_config, device, logger) -> None:
                         )
 
                     metrics = [
-                        global_step, "n/a",
-                        round(scheduler.get_last_lr()[0],
-                              7), "n/a", dev_stat_dict['dev loss'],
-                        dev_stat_dict['mcc'], dev_stat_dict['f1'],
-                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                        dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
+                        dev_stat_dict['f1'], dev_stat_dict['precision'],
+                        dev_stat_dict['recall']
                     ]
-                    metrics = [str(m) for m in metrics]
-                    with open(args.model_path + '.csv', 'a+') as data_file:
-                        print(', '.join(metrics), file=data_file)
+                    metrics_list += [str(m) for m in metrics]
 
                 if dev_config.bpc_secondary_dev_files:
                     l_counter = 0
@@ -820,19 +813,11 @@ def train(args, config, dev_config, device, logger) -> None:
                                 **e_args
                             )
                             metrics = [
-                                global_step, "n/a",
-                                round(scheduler.get_last_lr()[0],
-                                      7), "n/a", bpc_dev_stat_dict['dev loss'],
+                                bpc_dev_stat_dict['dev loss'],
                                 bpc_dev_stat_dict['precision'],
                                 bpc_dev_stat_dict['recall']
                             ]
-                            metrics = [str(m) for m in metrics]
-                            with open(
-                                args.model_path + '_' +
-                                dev_config.bpc_secondary_dev_files[l_counter].
-                                replace('/', '_') + '.csv', 'a+'
-                            ) as dev_data_file:
-                                print(', '.join(metrics), file=dev_data_file)
+                            metrics_list += [str(m) for m in metrics]
                             l_counter += 1
 
                 if dev_config.seg_secondary_dev_files:
@@ -843,20 +828,12 @@ def train(args, config, dev_config, device, logger) -> None:
                                 **e_args
                             )
                             metrics = [
-                                global_step, "n/a",
-                                round(scheduler.get_last_lr()[0],
-                                      7), "n/a", seg_dev_stat_dict['mcc'],
+                                seg_dev_stat_dict['mcc'],
                                 seg_dev_stat_dict['f1'],
                                 seg_dev_stat_dict['precision'],
                                 seg_dev_stat_dict['recall']
                             ]
-                            metrics = [str(m) for m in metrics]
-                            with open(
-                                args.model_path + '_' +
-                                dev_config.seg_secondary_dev_files[l_counter].
-                                replace('/', '_') + '.csv', 'a+'
-                            ) as dev_data_file:
-                                print(', '.join(metrics), file=dev_data_file)
+                            metrics_list += [str(m) for m in metrics]
                             l_counter += 1
 
                 if dev_config.both_secondary_dev_files:
@@ -867,22 +844,17 @@ def train(args, config, dev_config, device, logger) -> None:
                                 **e_args
                             )
                             metrics = [
-                                global_step, "n/a",
-                                round(scheduler.get_last_lr()[0],
-                                      7), "n/a", both_dev_stat_dict['dev loss'],
+                                both_dev_stat_dict['dev loss'],
                                 both_dev_stat_dict['mcc'],
                                 both_dev_stat_dict['f1'],
                                 both_dev_stat_dict['precision'],
                                 both_dev_stat_dict['recall']
                             ]
-                            metrics = [str(m) for m in metrics]
-                            with open(
-                                args.model_path + '_' +
-                                dev_config.both_secondary_dev_files[l_counter].
-                                replace('/', '_') + '.csv', 'a+'
-                            ) as dev_data_file:
-                                print(', '.join(metrics), file=dev_data_file)
+                            metrics_list += [str(m) for m in metrics]
                             l_counter += 1
+
+            with open(args.model_path + '.csv', 'a+') as data_file:
+                print(', '.join(metrics_list), file=data_file)
             """
             with torch.no_grad():
                 dev_stat_dict, dev_segmentations = do_eval(**eval_args)
@@ -972,6 +944,13 @@ def train(args, config, dev_config, device, logger) -> None:
                 batches_in_checkpoint = len(checkpoint_stats['loss'])
                 time_per_batch = round(elapsed / batches_in_checkpoint, 2)
                 current_train_loss = mean(checkpoint_stats['loss'])
+                metrics_list = [
+                    str(metric) for metric in [
+                        global_step, time_per_batch,
+                        round(lr, 7),
+                        round(current_train_loss, 2)
+                    ]
+                ]
 
                 if args.dev_file:
                     # Perform an eval run on the dev data
@@ -1019,14 +998,10 @@ def train(args, config, dev_config, device, logger) -> None:
                     f1 = dev_stat_dict['f1']
 
                     metrics = [
-                        global_step, time_per_batch,
-                        round(lr, 7),
-                        round(current_train_loss, 2), dev_loss, mcc, f1,
-                        dev_stat_dict['precision'], dev_stat_dict['recall']
+                        dev_loss, mcc, f1, dev_stat_dict['precision'],
+                        dev_stat_dict['recall']
                     ]
-                    metrics = [str(m) for m in metrics]
-                    with open(args.model_path + '.csv', 'a+') as data_file:
-                        print(', '.join(metrics), file=data_file)
+                    metrics_list += [str(m) for m in metrics]
 
                     # If the dev loss from the current checkpoint is better than
                     # the current best, save the current model to a file
@@ -1082,6 +1057,62 @@ def train(args, config, dev_config, device, logger) -> None:
                         break
 
                 elif args.dev_config:
+                    sec_metrics_list = []
+                    if dev_config.bpc_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_bpc_secondary_eval_args:
+                            with torch.no_grad():
+                                bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(
+                                    **e_args
+                                )
+
+                                dev_loss = bpc_dev_stat_dict['dev loss']
+
+                                metrics = [
+                                    dev_loss, bpc_dev_stat_dict['precision'],
+                                    bpc_dev_stat_dict['recall']
+                                ]
+                                sec_metrics_list += [str(m) for m in metrics]
+                                l_counter += 1
+
+                    if dev_config.seg_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_seg_secondary_eval_args:
+                            with torch.no_grad():
+                                seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(
+                                    **e_args
+                                )
+
+                                mcc = seg_dev_stat_dict['mcc']
+                                f1 = seg_dev_stat_dict['f1']
+
+                                metrics = [
+                                    mcc, f1, seg_dev_stat_dict['precision'],
+                                    seg_dev_stat_dict['recall']
+                                ]
+                                sec_metrics_list += [str(m) for m in metrics]
+                                l_counter += 1
+
+                    if dev_config.both_secondary_dev_files:
+                        l_counter = 0
+                        for e_args in list_of_both_secondary_eval_args:
+                            with torch.no_grad():
+                                both_dev_stat_dict, both_dev_stat_segmentations = do_eval(
+                                    **e_args
+                                )
+
+                                dev_loss = both_dev_stat_dict['dev loss']
+                                mcc = both_dev_stat_dict['mcc']
+                                f1 = both_dev_stat_dict['f1']
+
+                                metrics = [
+                                    dev_loss, mcc, f1,
+                                    both_dev_stat_dict['precision'],
+                                    both_dev_stat_dict['recall']
+                                ]
+                                sec_metrics_list += [str(m) for m in metrics]
+                                l_counter += 1
+
                     if dev_config.primary_dev_mode == 'bpc':
                         # Perform an eval run on the dev data
                         with torch.no_grad():
@@ -1132,14 +1163,12 @@ def train(args, config, dev_config, device, logger) -> None:
                         dev_loss = dev_stat_dict['dev loss']
 
                         metrics = [
-                            global_step, time_per_batch,
-                            round(lr, 7),
-                            round(current_train_loss, 2), dev_loss,
-                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                            dev_loss, dev_stat_dict['precision'],
+                            dev_stat_dict['recall']
                         ]
-                        metrics = [str(m) for m in metrics]
-                        with open(args.model_path + '.csv', 'a+') as data_file:
-                            print(', '.join(metrics), file=data_file)
+                        metrics_list += [
+                            str(m) for m in metrics
+                        ] + sec_metrics_list
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
@@ -1238,14 +1267,12 @@ def train(args, config, dev_config, device, logger) -> None:
                         f1 = dev_stat_dict['f1']
 
                         metrics = [
-                            global_step, time_per_batch,
-                            round(lr, 7),
-                            round(current_train_loss, 2), mcc, f1,
-                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                            mcc, f1, dev_stat_dict['precision'],
+                            dev_stat_dict['recall']
                         ]
-                        metrics = [str(m) for m in metrics]
-                        with open(args.model_path + '.csv', 'a+') as data_file:
-                            print(', '.join(metrics), file=data_file)
+                        metrics_list += [
+                            str(m) for m in metrics
+                        ] + sec_metrics_list
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
@@ -1355,14 +1382,12 @@ def train(args, config, dev_config, device, logger) -> None:
                         f1 = dev_stat_dict['f1']
 
                         metrics = [
-                            global_step, time_per_batch,
-                            round(lr, 7),
-                            round(current_train_loss, 2), dev_loss, mcc, f1,
-                            dev_stat_dict['precision'], dev_stat_dict['recall']
+                            mcc, f1, dev_stat_dict['precision'],
+                            dev_stat_dict['recall']
                         ]
-                        metrics = [str(m) for m in metrics]
-                        with open(args.model_path + '.csv', 'a+') as data_file:
-                            print(', '.join(metrics), file=data_file)
+                        metrics_list += [
+                            str(m) for m in metrics
+                        ] + sec_metrics_list
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
@@ -1420,95 +1445,8 @@ def train(args, config, dev_config, device, logger) -> None:
                             )
                             break
 
-                    if dev_config.bpc_secondary_dev_files:
-                        l_counter = 0
-                        for e_args in list_of_bpc_secondary_eval_args:
-                            with torch.no_grad():
-                                bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                dev_loss = bpc_dev_stat_dict['dev loss']
-
-                                metrics = [
-                                    global_step, time_per_batch,
-                                    round(lr, 7),
-                                    round(current_train_loss, 2), dev_loss,
-                                    bpc_dev_stat_dict['precision'],
-                                    bpc_dev_stat_dict['recall']
-                                ]
-                                metrics = [str(m) for m in metrics]
-                                with open(
-                                    args.model_path + '_' +
-                                    dev_config.bpc_secondary_dev_files[
-                                        l_counter].replace('/', '_') + '.csv',
-                                    'a+'
-                                ) as dev_data_file:
-                                    print(
-                                        ', '.join(metrics), file=dev_data_file
-                                    )
-                                l_counter += 1
-
-                    if dev_config.seg_secondary_dev_files:
-                        l_counter = 0
-                        for e_args in list_of_seg_secondary_eval_args:
-                            with torch.no_grad():
-                                seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                mcc = seg_dev_stat_dict['mcc']
-                                f1 = seg_dev_stat_dict['f1']
-
-                                metrics = [
-                                    global_step, time_per_batch,
-                                    round(lr, 7),
-                                    round(current_train_loss, 2), mcc, f1,
-                                    seg_dev_stat_dict['precision'],
-                                    seg_dev_stat_dict['recall']
-                                ]
-                                metrics = [str(m) for m in metrics]
-                                with open(
-                                    args.model_path + '_' +
-                                    dev_config.seg_secondary_dev_files[
-                                        l_counter].replace('/', '_') + '.csv',
-                                    'a+'
-                                ) as dev_data_file:
-                                    print(
-                                        ', '.join(metrics), file=dev_data_file
-                                    )
-                                l_counter += 1
-
-                    if dev_config.both_secondary_dev_files:
-                        l_counter = 0
-                        for e_args in list_of_both_secondary_eval_args:
-                            with torch.no_grad():
-                                both_dev_stat_dict, both_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                dev_loss = both_dev_stat_dict['dev loss']
-                                mcc = both_dev_stat_dict['mcc']
-                                f1 = both_dev_stat_dict['f1']
-
-                                metrics = [
-                                    global_step, time_per_batch,
-                                    round(lr, 7),
-                                    round(current_train_loss, 2), dev_loss, mcc,
-                                    f1, both_dev_stat_dict['precision'],
-                                    both_dev_stat_dict['recall']
-                                ]
-                                metrics = [str(m) for m in metrics]
-                                with open(
-                                    args.model_path + '_' +
-                                    dev_config.both_secondary_dev_files[
-                                        l_counter].replace('/', '_') + '.csv',
-                                    'a+'
-                                ) as dev_data_file:
-                                    print(
-                                        ', '.join(metrics), file=dev_data_file
-                                    )
-                                l_counter += 1
+                with open(args.model_path + '.csv', 'a+') as data_file:
+                    print(', '.join(metrics_list), file=data_file)
                 """
                 # Perform an eval run on the dev data
                 with torch.no_grad():
@@ -1614,6 +1552,8 @@ def train(args, config, dev_config, device, logger) -> None:
                 checkpoint_start_time = time.time()
                 checkpoint_stats = defaultdict(list)
 
+    with open(args.model_path + '.csv', 'a+') as data_file:
+        print(', '.join(metrics_list), file=data_file)
     logger.info("Training finished")
 
 
