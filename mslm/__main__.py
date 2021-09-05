@@ -32,8 +32,9 @@ from sklearn.metrics import precision_recall_fscore_support as fscore
 from torch.utils.data import DataLoader, RandomSampler
 
 from .mslm_config import MSLMConfig
-from .segmental_lm import SegmentalLanguageModel
 from .dev_config import devConfig
+from .slm import SegmentalLanguageModel
+
 # ------------------------------------------------------------------------------
 # Auxiliary Function Definitions
 # ------------------------------------------------------------------------------
@@ -369,6 +370,63 @@ def compute_eval_args(
         list_eval_args.append(eval_args)
 
     return list_eval_args
+
+
+def eval_step_metrics(
+    eval_args,
+    logger,
+    global_step=0,
+    max_train_steps=0,
+    time_per_batch=0.0,
+    lr=0.0,
+    current_train_loss=0.0,
+    mode='both',
+    print_sample=True
+) -> List[float]:
+    """
+    Perform an eval run and return metrics based on the mode of evaluation
+    """
+    # Perform an eval run on the dev data
+    with torch.no_grad():
+        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+
+    if print_sample and (global_step != 0):
+        # Print the current step, batch, learning rate, average time
+        # per batch, training loss, dev f1, and example segmentations
+        # for the current model
+        dev_stat_dict.update(
+            {
+                "step": f"{global_step}/{max_train_steps}",
+                "s/batch": time_per_batch,
+                "lr": round(lr, 5),
+                "train loss": round(current_train_loss, 3),
+            }
+        )
+
+    if print_sample:
+        logger.info(statbar_string(dev_stat_dict))
+        print("Sample dev segmentations:")
+        for seg in dev_segmentations[:8]:
+            print("    " + ' '.join([''.join(segment) for segment in seg]))
+
+    if mode == 'bpc':
+        metrics = [
+            dev_stat_dict['dev loss'], dev_stat_dict['precision'],
+            dev_stat_dict['recall']
+        ]
+    elif mode == 'seg':
+        metrics = [
+            dev_stat_dict['mcc'], dev_stat_dict['f1'],
+            dev_stat_dict['precision'], dev_stat_dict['recall']
+        ]
+    else:
+        metrics = [
+            dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
+            dev_stat_dict['f1'], dev_stat_dict['precision'],
+            dev_stat_dict['recall']
+        ]
+
+    return metrics
 
 
 # ------------------------------------------------------------------------------
@@ -709,155 +767,45 @@ def train(args, config, dev_config, device, logger) -> None:
                 ]
             ]
             if args.dev_file:
-                with torch.no_grad():
-                    dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                logger.info(statbar_string(dev_stat_dict))
-
-                print("Sample dev segmentations:")
-                for seg in dev_segmentations[:8]:
-                    print(
-                        "    " +
-                        ' '.join([''.join(segment) for segment in seg])
-                    )
-
-                metrics = [
-                    dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
-                    dev_stat_dict['f1'], dev_stat_dict['precision'],
-                    dev_stat_dict['recall']
-                ]
+                metrics = eval_step_metrics(eval_args, logger)
                 metrics_list += [str(m) for m in metrics]
 
             elif args.dev_config:
                 if dev_config.primary_dev_mode == 'bpc':
-                    with torch.no_grad():
-                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                    logger.info(statbar_string(dev_stat_dict))
-
-                    print("Sample dev segmentations:")
-                    for seg in dev_segmentations[:8]:
-                        print(
-                            "    " +
-                            ' '.join([''.join(segment) for segment in seg])
-                        )
-
-                    metrics = [
-                        dev_stat_dict['dev loss'], dev_stat_dict['precision'],
-                        dev_stat_dict['recall']
-                    ]
+                    metrics = eval_step_metrics(eval_args, logger, mode='bpc')
                     metrics_list += [str(m) for m in metrics]
 
                 elif dev_config.primary_dev_mode == 'seg':
-                    with torch.no_grad():
-                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                    logger.info(statbar_string(dev_stat_dict))
-
-                    print("Sample dev segmentations:")
-                    for seg in dev_segmentations[:8]:
-                        print(
-                            "    " +
-                            ' '.join([''.join(segment) for segment in seg])
-                        )
-
-                    metrics = [
-                        dev_stat_dict['mcc'], dev_stat_dict['f1'],
-                        dev_stat_dict['precision'], dev_stat_dict['recall']
-                    ]
+                    metrics = eval_step_metrics(eval_args, logger, mode='seg')
                     metrics_list += [str(m) for m in metrics]
 
                 elif dev_config.primary_dev_mode == 'both':
-                    with torch.no_grad():
-                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                    logger.info(statbar_string(dev_stat_dict))
-
-                    print("Sample dev segmentations:")
-                    for seg in dev_segmentations[:8]:
-                        print(
-                            "    " +
-                            ' '.join([''.join(segment) for segment in seg])
-                        )
-
-                    metrics = [
-                        dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
-                        dev_stat_dict['f1'], dev_stat_dict['precision'],
-                        dev_stat_dict['recall']
-                    ]
+                    metrics = eval_step_metrics(eval_args, logger, mode='both')
                     metrics_list += [str(m) for m in metrics]
 
                 if dev_config.bpc_secondary_dev_files:
-                    l_counter = 0
                     for e_args in list_of_bpc_secondary_eval_args:
-                        with torch.no_grad():
-                            bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(
-                                **e_args
-                            )
-                            metrics = [
-                                bpc_dev_stat_dict['dev loss'],
-                                bpc_dev_stat_dict['precision'],
-                                bpc_dev_stat_dict['recall']
-                            ]
-                            metrics_list += [str(m) for m in metrics]
-                            l_counter += 1
+                        metrics = eval_step_metrics(
+                            e_args, logger, mode='bpc', print_sample=False
+                        )
+                        metrics_list += [str(m) for m in metrics]
 
                 if dev_config.seg_secondary_dev_files:
-                    l_counter = 0
                     for e_args in list_of_seg_secondary_eval_args:
-                        with torch.no_grad():
-                            seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(
-                                **e_args
-                            )
-                            metrics = [
-                                seg_dev_stat_dict['mcc'],
-                                seg_dev_stat_dict['f1'],
-                                seg_dev_stat_dict['precision'],
-                                seg_dev_stat_dict['recall']
-                            ]
-                            metrics_list += [str(m) for m in metrics]
-                            l_counter += 1
+                        metrics = eval_step_metrics(
+                            e_args, logger, mode='seg', print_sample=False
+                        )
+                        metrics_list += [str(m) for m in metrics]
 
                 if dev_config.both_secondary_dev_files:
-                    l_counter = 0
                     for e_args in list_of_both_secondary_eval_args:
-                        with torch.no_grad():
-                            both_dev_stat_dict, both_dev_stat_segmentations = do_eval(
-                                **e_args
-                            )
-                            metrics = [
-                                both_dev_stat_dict['dev loss'],
-                                both_dev_stat_dict['mcc'],
-                                both_dev_stat_dict['f1'],
-                                both_dev_stat_dict['precision'],
-                                both_dev_stat_dict['recall']
-                            ]
-                            metrics_list += [str(m) for m in metrics]
-                            l_counter += 1
+                        metrics = eval_step_metrics(
+                            e_args, logger, mode='both', print_sample=False
+                        )
+                        metrics_list += [str(m) for m in metrics]
 
             with open(args.model_path + '.csv', 'a+') as data_file:
                 print(', '.join(metrics_list), file=data_file)
-            """
-            with torch.no_grad():
-                dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-            logger.info(statbar_string(dev_stat_dict))
-
-            print("Sample dev segmentations:")
-            for seg in dev_segmentations[:8]:
-                print("    " + ' '.join([''.join(segment) for segment in seg]))
-
-            metrics = [
-                global_step, "n/a",
-                round(scheduler.get_last_lr()[0],
-                      7), "n/a", dev_stat_dict['dev loss'],
-                dev_stat_dict['mcc'], dev_stat_dict['f1'],
-                dev_stat_dict['precision'], dev_stat_dict['recall']
-            ]
-            metrics = [str(m) for m in metrics]
-            with open(args.model_path + '.csv', 'a+') as data_file:
-                print(', '.join(metrics), file=data_file)
-            """
 
             checkpoint_start_time = time.time()
             checkpoint_stats = defaultdict(list)
@@ -926,6 +874,22 @@ def train(args, config, dev_config, device, logger) -> None:
                 batches_in_checkpoint = len(checkpoint_stats['loss'])
                 time_per_batch = round(elapsed / batches_in_checkpoint, 2)
                 current_train_loss = mean(checkpoint_stats['loss'])
+
+                time_profile_dict = {
+                    "average forward time":
+                        f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
+                    "forward nn":
+                        f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
+                    "forward lattice":
+                        f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
+                    "backward":
+                        f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
+                    "optimizer":
+                        f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
+                }
+                logger.info(statbar_string(time_profile_dict))
+
+                # Initialize the metrics list with fixed parameters
                 metrics_list = [
                     str(metric) for metric in [
                         global_step, time_per_batch,
@@ -935,55 +899,12 @@ def train(args, config, dev_config, device, logger) -> None:
                 ]
 
                 if args.dev_file:
-                    # Perform an eval run on the dev data
-                    with torch.no_grad():
-                        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                    # Print the current step, batch, learning rate, average time
-                    # per batch, training loss, dev f1, and example segmentations
-                    # for the current model
-                    dev_stat_dict.update(
-                        {
-                            "step": f"{global_step}/{config.max_train_steps}",
-                            "s/batch": time_per_batch,
-                            "lr": round(lr, 5),
-                            "train loss": round(current_train_loss, 3),
-                        }
+                    metrics = eval_step_metrics(
+                        eval_args, logger, global_step, config.max_train_steps,
+                        time_per_batch, lr, current_train_loss
                     )
-
-                    logger.info(statbar_string(dev_stat_dict))
-
-                    time_profile_dict = {
-                        "average forward time":
-                            f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
-                        "forward nn":
-                            f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
-                        "forward lattice":
-                            f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
-                        "backward":
-                            f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
-                        "optimizer":
-                            f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
-                    }
-
-                    logger.info(statbar_string(time_profile_dict))
-
-                    print("Sample dev segmentations:")
-                    for seg in dev_segmentations[:8]:
-                        print(
-                            "    " +
-                            ' '.join([''.join(segment) for segment in seg])
-                        )
-
-                    dev_loss = dev_stat_dict['dev loss']
-                    mcc = dev_stat_dict['mcc']
-                    f1 = dev_stat_dict['f1']
-
-                    metrics = [
-                        dev_loss, mcc, f1, dev_stat_dict['precision'],
-                        dev_stat_dict['recall']
-                    ]
                     metrics_list += [str(m) for m in metrics]
+                    dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
                     # If the dev loss from the current checkpoint is better than
                     # the current best, save the current model to a file
@@ -1041,116 +962,53 @@ def train(args, config, dev_config, device, logger) -> None:
                 elif args.dev_config:
                     sec_metrics_list = []
                     if dev_config.bpc_secondary_dev_files:
-                        l_counter = 0
                         for e_args in list_of_bpc_secondary_eval_args:
-                            with torch.no_grad():
-                                bpc_dev_stat_dict, bpc_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                dev_loss = bpc_dev_stat_dict['dev loss']
-
-                                metrics = [
-                                    dev_loss, bpc_dev_stat_dict['precision'],
-                                    bpc_dev_stat_dict['recall']
-                                ]
-                                sec_metrics_list += [str(m) for m in metrics]
-                                l_counter += 1
+                            metrics = eval_step_metrics(
+                                e_args,
+                                logger,
+                                global_step,
+                                mode='bpc',
+                                print_sample=False
+                            )
+                            sec_metrics_list += [str(m) for m in metrics]
 
                     if dev_config.seg_secondary_dev_files:
-                        l_counter = 0
                         for e_args in list_of_seg_secondary_eval_args:
-                            with torch.no_grad():
-                                seg_dev_stat_dict, seg_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                mcc = seg_dev_stat_dict['mcc']
-                                f1 = seg_dev_stat_dict['f1']
-
-                                metrics = [
-                                    mcc, f1, seg_dev_stat_dict['precision'],
-                                    seg_dev_stat_dict['recall']
-                                ]
-                                sec_metrics_list += [str(m) for m in metrics]
-                                l_counter += 1
+                            metrics = eval_step_metrics(
+                                e_args,
+                                logger,
+                                global_step,
+                                mode='seg',
+                                print_sample=False
+                            )
+                            sec_metrics_list += [str(m) for m in metrics]
 
                     if dev_config.both_secondary_dev_files:
-                        l_counter = 0
                         for e_args in list_of_both_secondary_eval_args:
-                            with torch.no_grad():
-                                both_dev_stat_dict, both_dev_stat_segmentations = do_eval(
-                                    **e_args
-                                )
-
-                                dev_loss = both_dev_stat_dict['dev loss']
-                                mcc = both_dev_stat_dict['mcc']
-                                f1 = both_dev_stat_dict['f1']
-
-                                metrics = [
-                                    dev_loss, mcc, f1,
-                                    both_dev_stat_dict['precision'],
-                                    both_dev_stat_dict['recall']
-                                ]
-                                sec_metrics_list += [str(m) for m in metrics]
-                                l_counter += 1
+                            metrics = eval_step_metrics(
+                                e_args,
+                                logger,
+                                global_step,
+                                mode='both',
+                                print_sample=False
+                            )
+                            sec_metrics_list += [str(m) for m in metrics]
 
                     if dev_config.primary_dev_mode == 'bpc':
-                        # Perform an eval run on the dev data
-                        with torch.no_grad():
-                            dev_stat_dict, dev_segmentations = do_eval(
-                                **eval_args
-                            )
-
-                        # Print the current step, batch, learning rate, average time
-                        # per batch, training loss, dev f1, and example segmentations
-                        # for the current model
-                        dev_stat_dict.update(
-                            {
-                                "step":
-                                    f"{global_step}/{config.max_train_steps}",
-                                "s/batch":
-                                    time_per_batch,
-                                "lr":
-                                    round(lr, 5),
-                                "train loss":
-                                    round(current_train_loss, 3),
-                            }
+                        metrics = eval_step_metrics(
+                            eval_args,
+                            logger,
+                            global_step,
+                            config.max_train_steps,
+                            time_per_batch,
+                            lr,
+                            current_train_loss,
+                            mode='bpc'
                         )
-
-                        logger.info(statbar_string(dev_stat_dict))
-
-                        time_profile_dict = {
-                            "average forward time":
-                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
-                            "forward nn":
-                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
-                            "forward lattice":
-                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
-                            "backward":
-                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
-                            "optimizer":
-                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
-                        }
-
-                        logger.info(statbar_string(time_profile_dict))
-
-                        print("Sample dev segmentations:")
-                        for seg in dev_segmentations[:8]:
-                            print(
-                                "    " +
-                                ' '.join([''.join(segment) for segment in seg])
-                            )
-
-                        dev_loss = dev_stat_dict['dev loss']
-
-                        metrics = [
-                            dev_loss, dev_stat_dict['precision'],
-                            dev_stat_dict['recall']
-                        ]
                         metrics_list += [
                             str(m) for m in metrics
                         ] + sec_metrics_list
+                        dev_loss = metrics[0]
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
@@ -1198,63 +1056,20 @@ def train(args, config, dev_config, device, logger) -> None:
                             break
 
                     elif dev_config.primary_dev_mode == 'seg':
-                        # Perform an eval run on the dev data
-                        with torch.no_grad():
-                            dev_stat_dict, dev_segmentations = do_eval(
-                                **eval_args
-                            )
-
-                        # Print the current step, batch, learning rate, average time
-                        # per batch, training loss, dev f1, and example segmentations
-                        # for the current model
-                        dev_stat_dict.update(
-                            {
-                                "step":
-                                    f"{global_step}/{config.max_train_steps}",
-                                "s/batch":
-                                    time_per_batch,
-                                "lr":
-                                    round(lr, 5),
-                                "train loss":
-                                    round(current_train_loss, 3),
-                            }
+                        metrics = eval_step_metrics(
+                            eval_args,
+                            logger,
+                            global_step,
+                            config.max_train_steps,
+                            time_per_batch,
+                            lr,
+                            current_train_loss,
+                            mode='seg'
                         )
-
-                        logger.info(statbar_string(dev_stat_dict))
-
-                        time_profile_dict = {
-                            "average forward time":
-                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
-                            "forward nn":
-                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
-                            "forward lattice":
-                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
-                            "backward":
-                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
-                            "optimizer":
-                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
-                        }
-
-                        logger.info(statbar_string(time_profile_dict))
-
-                        print("Sample dev segmentations:")
-                        for seg in dev_segmentations[:8]:
-                            print(
-                                "    " +
-                                ' '.join([''.join(segment) for segment in seg])
-                            )
-
-                        dev_loss = dev_stat_dict['dev loss']
-                        mcc = dev_stat_dict['mcc']
-                        f1 = dev_stat_dict['f1']
-
-                        metrics = [
-                            mcc, f1, dev_stat_dict['precision'],
-                            dev_stat_dict['recall']
-                        ]
                         metrics_list += [
                             str(m) for m in metrics
                         ] + sec_metrics_list
+                        dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
@@ -1313,63 +1128,20 @@ def train(args, config, dev_config, device, logger) -> None:
                             break
 
                     elif dev_config.primary_dev_mode == 'both':
-                        # Perform an eval run on the dev data
-                        with torch.no_grad():
-                            dev_stat_dict, dev_segmentations = do_eval(
-                                **eval_args
-                            )
-
-                        # Print the current step, batch, learning rate, average time
-                        # per batch, training loss, dev f1, and example segmentations
-                        # for the current model
-                        dev_stat_dict.update(
-                            {
-                                "step":
-                                    f"{global_step}/{config.max_train_steps}",
-                                "s/batch":
-                                    time_per_batch,
-                                "lr":
-                                    round(lr, 5),
-                                "train loss":
-                                    round(current_train_loss, 3),
-                            }
+                        metrics = eval_step_metrics(
+                            eval_args,
+                            logger,
+                            global_step,
+                            config.max_train_steps,
+                            time_per_batch,
+                            lr,
+                            current_train_loss,
+                            mode='both'
                         )
-
-                        logger.info(statbar_string(dev_stat_dict))
-
-                        time_profile_dict = {
-                            "average forward time":
-                                f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
-                            "forward nn":
-                                f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
-                            "forward lattice":
-                                f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
-                            "backward":
-                                f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
-                            "optimizer":
-                                f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
-                        }
-
-                        logger.info(statbar_string(time_profile_dict))
-
-                        print("Sample dev segmentations:")
-                        for seg in dev_segmentations[:8]:
-                            print(
-                                "    " +
-                                ' '.join([''.join(segment) for segment in seg])
-                            )
-
-                        dev_loss = dev_stat_dict['dev loss']
-                        mcc = dev_stat_dict['mcc']
-                        f1 = dev_stat_dict['f1']
-
-                        metrics = [
-                            mcc, f1, dev_stat_dict['precision'],
-                            dev_stat_dict['recall']
-                        ]
                         metrics_list += [
                             str(m) for m in metrics
                         ] + sec_metrics_list
+                        dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
                         # If the dev loss from the current checkpoint is better than
                         # the current best, save the current model to a file
