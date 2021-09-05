@@ -343,6 +343,34 @@ def dev_file_load(
     }
 
 
+def compute_eval_args(
+    model, dev_dataloaders, device, max_seg_length, eoseg_idx,
+    char_ids_to_subword_id, vocab, all_gold_boundaries, dev_set_unsort_pmt,
+    clear_cache_by_batch
+) -> List[dict]:
+    """
+    Create a dictionary containing eval arguments corresponding to a dev file
+    """
+
+    list_eval_args = []
+    for i in range(len(dev_dataloaders)):
+        eval_args = {
+            'model': model,
+            'data_loader': dev_dataloaders[i],
+            'device': device,
+            'max_seg_len': max_seg_length,
+            'eoseg_idx': eoseg_idx,
+            'chars_to_subword_id': char_ids_to_subword_id,
+            'vocab': vocab,
+            'gold_boundaries': all_gold_boundaries[i],
+            'unsort_permutation': dev_set_unsort_pmt[i],
+            'clear_cache_by_batch': clear_cache_by_batch
+        }
+        list_eval_args.append(eval_args)
+
+    return list_eval_args
+
+
 # ------------------------------------------------------------------------------
 # Train and Predict Functions
 # ------------------------------------------------------------------------------
@@ -559,7 +587,6 @@ def train(args, config, dev_config, device, logger) -> None:
     bpc_metrics = ["dev_loss", "precision", "recall"]
     seg_metrics = ["mcc", "f1", "precision", "recall"]
     metric_file_headers = []
-
     if args.dev_file:
         metric_file_headers = [
             os.path.basename(args.dev_file) + '_' + metric
@@ -588,14 +615,12 @@ def train(args, config, dev_config, device, logger) -> None:
                     os.path.basename(d_file) + '_' + metric
                     for metric in bpc_metrics
                 ]
-
         if dev_config.seg_secondary_dev_files:
             for d_file in dev_config.seg_secondary_dev_files:
                 metric_file_headers += [
                     os.path.basename(d_file) + '_' + metric
                     for metric in seg_metrics
                 ]
-
         if dev_config.both_secondary_dev_files:
             for d_file in dev_config.both_secondary_dev_files:
                 metric_file_headers += [
@@ -609,89 +634,46 @@ def train(args, config, dev_config, device, logger) -> None:
 
     #Make eval_args
     if args.dev_file:
-        eval_args = {
-            'model': model,
-            'data_loader': dev_dataloader,
-            'device': device,
-            'max_seg_len': config.max_seg_length,
-            'eoseg_idx': eoseg_idx,
-            'chars_to_subword_id': char_ids_to_subword_id,
-            'vocab': vocab,
-            'gold_boundaries': all_gold_boundaries,
-            'unsort_permutation': dev_set_unsort_pmt,
-            'clear_cache_by_batch': config.clear_cache_by_batch
-        }
+        eval_args = compute_eval_args(
+            model, [dev_dataloader], device, config.max_seg_length, eoseg_idx,
+            char_ids_to_subword_id, vocab, [all_gold_boundaries],
+            [dev_set_unsort_pmt], config.clear_cache_by_batch
+        )[0]
 
     elif args.dev_config:
         #primary dev file
-        eval_args = {
-            'model': model,
-            'data_loader': dev_dataloader,
-            'device': device,
-            'max_seg_len': config.max_seg_length,
-            'eoseg_idx': eoseg_idx,
-            'chars_to_subword_id': char_ids_to_subword_id,
-            'vocab': vocab,
-            'gold_boundaries': all_gold_boundaries,
-            'unsort_permutation': dev_set_unsort_pmt,
-            'clear_cache_by_batch': config.clear_cache_by_batch
-        }
+        eval_args = compute_eval_args(
+            model, [dev_dataloader], device, config.max_seg_length, eoseg_idx,
+            char_ids_to_subword_id, vocab, [all_gold_boundaries],
+            [dev_set_unsort_pmt], config.clear_cache_by_batch
+        )[0]
 
         #bpc mode secondary dev files
         if dev_config.bpc_secondary_dev_files:
-            list_of_bpc_secondary_eval_args = []
-            for i in range(len(bpc_secondary_dev_dataloaders)):
-                bpc_secondary_eval_args = {
-                    'model': model,
-                    'data_loader': bpc_secondary_dev_dataloaders[i],
-                    'device': device,
-                    'max_seg_len': config.max_seg_length,
-                    'eoseg_idx': eoseg_idx,
-                    'chars_to_subword_id': char_ids_to_subword_id,
-                    'vocab': vocab,
-                    'gold_boundaries': bpc_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': bpc_secondary_dev_set_unsort_pmt[i],
-                    'clear_cache_by_batch': config.clear_cache_by_batch
-                }
-                list_of_bpc_secondary_eval_args.append(bpc_secondary_eval_args)
+            list_of_bpc_secondary_eval_args = compute_eval_args(
+                model, bpc_secondary_dev_dataloaders, device,
+                config.max_seg_length, eoseg_idx, char_ids_to_subword_id, vocab,
+                bpc_secondary_all_gold_boundaries,
+                bpc_secondary_dev_set_unsort_pmt, config.clear_cache_by_batch
+            )
 
         #seg qual mode secondary dev files
         if dev_config.seg_secondary_dev_files:
-            list_of_seg_secondary_eval_args = []
-            for i in range(len(seg_secondary_dev_dataloaders)):
-                seg_secondary_eval_args = {
-                    'model': model,
-                    'data_loader': seg_secondary_dev_dataloaders[i],
-                    'device': device,
-                    'max_seg_len': config.max_seg_length,
-                    'eoseg_idx': eoseg_idx,
-                    'chars_to_subword_id': char_ids_to_subword_id,
-                    'vocab': vocab,
-                    'gold_boundaries': seg_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': seg_secondary_dev_set_unsort_pmt[i],
-                    'clear_cache_by_batch': config.clear_cache_by_batch
-                }
-                list_of_seg_secondary_eval_args.append(seg_secondary_eval_args)
+            list_of_seg_secondary_eval_args = compute_eval_args(
+                model, seg_secondary_dev_dataloaders, device,
+                config.max_seg_length, eoseg_idx, char_ids_to_subword_id, vocab,
+                seg_secondary_all_gold_boundaries,
+                seg_secondary_dev_set_unsort_pmt, config.clear_cache_by_batch
+            )
 
         #both mode secondary dev files
         if dev_config.both_secondary_dev_files:
-            list_of_both_secondary_eval_args = []
-            for i in range(len(both_secondary_dev_dataloaders)):
-                both_secondary_eval_args = {
-                    'model': model,
-                    'data_loader': both_secondary_dev_dataloaders[i],
-                    'device': device,
-                    'max_seg_len': config.max_seg_length,
-                    'eoseg_idx': eoseg_idx,
-                    'chars_to_subword_id': char_ids_to_subword_id,
-                    'vocab': vocab,
-                    'gold_boundaries': both_secondary_all_gold_boundaries[i],
-                    'unsort_permutation': both_secondary_dev_set_unsort_pmt[i],
-                    'clear_cache_by_batch': config.clear_cache_by_batch
-                }
-                list_of_both_secondary_eval_args.append(
-                    both_secondary_eval_args
-                )
+            list_of_both_secondary_eval_args = compute_eval_args(
+                model, both_secondary_dev_dataloaders, device,
+                config.max_seg_length, eoseg_idx, char_ids_to_subword_id, vocab,
+                both_secondary_all_gold_boundaries,
+                both_secondary_dev_set_unsort_pmt, config.clear_cache_by_batch
+            )
 
     train_args = {
         'data': None,
