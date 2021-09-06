@@ -429,6 +429,81 @@ def eval_step_metrics(
     return metrics
 
 
+def eval_save_models(
+    model_architecture,
+    model_state_dict,
+    optimizer_state_dict,
+    scheduler_state_dict,
+    vocab_file,
+    subword_vocab_file,
+    logger,
+    dev_loss,
+    mcc,
+    f1,
+    best_loss,
+    best_mcc,
+    best_f1,
+    checkpoints_wo_improvement,
+    is_final,
+    args_model_path,
+    config_early_stopping,
+    global_step,
+    mode='both'
+):
+
+    return_dict = {
+        'checkpoints_wo_improvement': checkpoints_wo_improvement,
+        'best_loss': best_loss,
+        'best_mcc': best_mcc,
+        'best_f1': best_f1,
+        'early_stop': False
+    }
+
+    # If the dev loss from the current checkpoint is better than
+    # the current best, save the current model to a file
+    checkpoint = {
+        'model_architecture': model_architecture,
+        'state_dict': model_state_dict,
+        'optimizer': optimizer_state_dict,
+        'scheduler': scheduler_state_dict,
+        'vocab_file': vocab_file,
+        'subword_vocab_file': subword_vocab_file
+    }
+    if dev_loss < return_dict['best_loss']:
+        return_dict['best_loss'] = dev_loss
+        torch.save(checkpoint, args_model_path + '_best_loss.model')
+        logger.info(f"New best loss at step {global_step}")
+        return_dict['checkpoints_wo_improvement'] = 0
+    else:
+        return_dict['checkpoints_wo_improvement'] += 1
+        improvement_stopped = (
+            config_early_stopping and
+            return_dict['checkpoints_wo_improvement'] >= config_early_stopping
+        )
+        if improvement_stopped:
+            logger.info(
+                f"Stopping early at step {global_step} due to no"
+                f" dev loss improvement in {config_early_stopping}"
+                " checkpoints"
+            )
+            torch.save(checkpoint, args_model_path + '_final.model')
+            logger.info(f"Saved model at step {global_step} as final model")
+            return_dict['early_stop'] = True
+            return return_dict
+    if mode != 'bpc' and (mcc > return_dict['best_mcc']):
+        return_dict['best_mcc'] = mcc
+        torch.save(checkpoint, args_model_path + '_best_mcc.model')
+        logger.info(f"New best mcc at step {global_step}")
+    if mode != 'bpc' and (f1 > return_dict['best_f1']):
+        return_dict['best_f1'] = f1
+        torch.save(checkpoint, args_model_path + '_best_f1.model')
+        logger.info(f"New best f1 at step {global_step}")
+    if is_final:
+        torch.save(checkpoint, args_model_path + '_final.model')
+
+    return return_dict
+
+
 # ------------------------------------------------------------------------------
 # Train and Predict Functions
 # ------------------------------------------------------------------------------
@@ -906,57 +981,21 @@ def train(args, config, dev_config, device, logger) -> None:
                     metrics_list += [str(m) for m in metrics]
                     dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
-                    # If the dev loss from the current checkpoint is better than
-                    # the current best, save the current model to a file
-                    checkpoint = {
-                        'model_architecture': model_architecture,
-                        'state_dict': model.state_dict(),
-                        'optimizer': optimizer.state_dict(),
-                        'scheduler': scheduler.state_dict(),
-                        'vocab_file': vocab_file,
-                        'subword_vocab_file': subword_vocab_file
-                    }
-                    if dev_loss < best_loss:
-                        best_loss = dev_loss
-                        torch.save(
-                            checkpoint, args.model_path + '_best_loss.model'
-                        )
-                        logger.info(f"New best loss at step {global_step}")
-                        checkpoints_wo_improvement = 0
-                    else:
-                        checkpoints_wo_improvement += 1
-                        improvement_stopped = (
-                            config.early_stopping and
-                            checkpoints_wo_improvement >= config.early_stopping
-                        )
-                        if improvement_stopped:
-                            logger.info(
-                                f"Stopping early at step {global_step} due to no"
-                                f" dev loss improvement in {config.early_stopping}"
-                                " checkpoints"
-                            )
-                            torch.save(
-                                checkpoint, args.model_path + '_final.model'
-                            )
-                            logger.info(
-                                f"Saved model at step {global_step} as final model"
-                            )
-                            early_stop = True
-                            break
-                    if mcc > best_mcc:
-                        best_mcc = mcc
-                        torch.save(
-                            checkpoint, args.model_path + '_best_mcc.model'
-                        )
-                        logger.info(f"New best mcc at step {global_step}")
-                    if f1 > best_f1:
-                        best_f1 = f1
-                        torch.save(
-                            checkpoint, args.model_path + '_best_f1.model'
-                        )
-                        logger.info(f"New best f1 at step {global_step}")
-                    if is_final:
-                        torch.save(checkpoint, args.model_path + '_final.model')
+                    return_dict = eval_save_models(
+                        model_architecture, model.state_dict(),
+                        optimizer.state_dict(), scheduler.state_dict(),
+                        vocab_file, subword_vocab_file, logger, dev_loss, mcc,
+                        f1, best_loss, best_mcc, best_f1,
+                        checkpoints_wo_improvement, is_final, args.model_path,
+                        config.early_stopping, global_step
+                    )
+                    checkpoints_wo_improvement = return_dict[
+                        'checkpoints_wo_improvement']
+                    best_loss = return_dict['best_loss']
+                    best_mcc = return_dict['best_mcc']
+                    best_f1 = return_dict['best_f1']
+                    early_stop = return_dict['early_stop']
+                    if is_final or early_stop:
                         break
 
                 elif args.dev_config:
@@ -1010,49 +1049,32 @@ def train(args, config, dev_config, device, logger) -> None:
                         ] + sec_metrics_list
                         dev_loss = metrics[0]
 
-                        # If the dev loss from the current checkpoint is better than
-                        # the current best, save the current model to a file
-                        checkpoint = {
-                            'model_architecture': model_architecture,
-                            'state_dict': model.state_dict(),
-                            'optimizer': optimizer.state_dict(),
-                            'scheduler': scheduler.state_dict(),
-                            'vocab_file': vocab_file,
-                            'subword_vocab_file': subword_vocab_file
-                        }
-                        if dev_loss < best_loss:
-                            best_loss = dev_loss
-                            torch.save(
-                                checkpoint, args.model_path + '_best_loss.model'
-                            )
-                            logger.info(f"New best loss at step {global_step}")
-                            checkpoints_wo_improvement = 0
-                        else:
-                            checkpoints_wo_improvement += 1
-                            improvement_stopped = (
-                                config.early_stopping and
-                                checkpoints_wo_improvement >=
-                                config.early_stopping
-                            )
-                            if improvement_stopped:
-                                logger.info(
-                                    f"Stopping early at step {global_step} due to no"
-                                    f" dev loss improvement in {config.early_stopping}"
-                                    " checkpoints"
-                                )
-                                torch.save(
-                                    checkpoint, args.model_path + '_final.model'
-                                )
-                                logger.info(
-                                    f"Saved model at step {global_step} as final model"
-                                )
-                                early_stop = True
-                                break
-
-                        if is_final:
-                            torch.save(
-                                checkpoint, args.model_path + '_final.model'
-                            )
+                        return_dict = eval_save_models(
+                            model_architecture,
+                            model.state_dict(),
+                            optimizer.state_dict(),
+                            scheduler.state_dict(),
+                            vocab_file,
+                            subword_vocab_file,
+                            logger,
+                            dev_loss,
+                            None,
+                            None,
+                            best_loss,
+                            best_mcc,
+                            best_f1,
+                            checkpoints_wo_improvement,
+                            is_final,
+                            args.model_path,
+                            config.early_stopping,
+                            global_step,
+                            mode='bpc'
+                        )
+                        checkpoints_wo_improvement = return_dict[
+                            'checkpoints_wo_improvement']
+                        best_loss = return_dict['best_loss']
+                        early_stop = return_dict['early_stop']
+                        if is_final or early_stop:
                             break
 
                     elif dev_config.primary_dev_mode == 'seg':
@@ -1071,60 +1093,34 @@ def train(args, config, dev_config, device, logger) -> None:
                         ] + sec_metrics_list
                         dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
-                        # If the dev loss from the current checkpoint is better than
-                        # the current best, save the current model to a file
-                        checkpoint = {
-                            'model_architecture': model_architecture,
-                            'state_dict': model.state_dict(),
-                            'optimizer': optimizer.state_dict(),
-                            'scheduler': scheduler.state_dict(),
-                            'vocab_file': vocab_file,
-                            'subword_vocab_file': subword_vocab_file
-                        }
-                        if dev_loss < best_loss:
-                            best_loss = dev_loss
-                            torch.save(
-                                checkpoint, args.model_path + '_best_loss.model'
-                            )
-                            logger.info(f"New best loss at step {global_step}")
-                            checkpoints_wo_improvement = 0
-                        else:
-                            checkpoints_wo_improvement += 1
-                            improvement_stopped = (
-                                config.early_stopping and
-                                checkpoints_wo_improvement >=
-                                config.early_stopping
-                            )
-                            if improvement_stopped:
-                                logger.info(
-                                    f"Stopping early at step {global_step} due to no"
-                                    f" dev loss improvement in {config.early_stopping}"
-                                    " checkpoints"
-                                )
-                                torch.save(
-                                    checkpoint, args.model_path + '_final.model'
-                                )
-                                logger.info(
-                                    f"Saved model at step {global_step} as final model"
-                                )
-                                early_stop = True
-                                break
-                        if mcc > best_mcc:
-                            best_mcc = mcc
-                            torch.save(
-                                checkpoint, args.model_path + '_best_mcc.model'
-                            )
-                            logger.info(f"New best mcc at step {global_step}")
-                        if f1 > best_f1:
-                            best_f1 = f1
-                            torch.save(
-                                checkpoint, args.model_path + '_best_f1.model'
-                            )
-                            logger.info(f"New best f1 at step {global_step}")
-                        if is_final:
-                            torch.save(
-                                checkpoint, args.model_path + '_final.model'
-                            )
+                        return_dict = eval_save_models(
+                            model_architecture,
+                            model.state_dict(),
+                            optimizer.state_dict(),
+                            scheduler.state_dict(),
+                            vocab_file,
+                            subword_vocab_file,
+                            logger,
+                            dev_loss,
+                            mcc,
+                            f1,
+                            best_loss,
+                            best_mcc,
+                            best_f1,
+                            checkpoints_wo_improvement,
+                            is_final,
+                            args.model_path,
+                            config.early_stopping,
+                            global_step,
+                            mode='seg'
+                        )
+                        checkpoints_wo_improvement = return_dict[
+                            'checkpoints_wo_improvement']
+                        best_loss = return_dict['best_loss']
+                        best_mcc = return_dict['best_mcc']
+                        best_f1 = return_dict['best_f1']
+                        early_stop = return_dict['early_stop']
+                        if is_final or early_stop:
                             break
 
                     elif dev_config.primary_dev_mode == 'both':
@@ -1143,164 +1139,38 @@ def train(args, config, dev_config, device, logger) -> None:
                         ] + sec_metrics_list
                         dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
 
-                        # If the dev loss from the current checkpoint is better than
-                        # the current best, save the current model to a file
-                        checkpoint = {
-                            'model_architecture': model_architecture,
-                            'state_dict': model.state_dict(),
-                            'optimizer': optimizer.state_dict(),
-                            'scheduler': scheduler.state_dict(),
-                            'vocab_file': vocab_file,
-                            'subword_vocab_file': subword_vocab_file
-                        }
-                        if dev_loss < best_loss:
-                            best_loss = dev_loss
-                            torch.save(
-                                checkpoint, args.model_path + '_best_loss.model'
-                            )
-                            logger.info(f"New best loss at step {global_step}")
-                            checkpoints_wo_improvement = 0
-                        else:
-                            checkpoints_wo_improvement += 1
-                            improvement_stopped = (
-                                config.early_stopping and
-                                checkpoints_wo_improvement >=
-                                config.early_stopping
-                            )
-                            if improvement_stopped:
-                                logger.info(
-                                    f"Stopping early at step {global_step} due to no"
-                                    f" dev loss improvement in {config.early_stopping}"
-                                    " checkpoints"
-                                )
-                                torch.save(
-                                    checkpoint, args.model_path + '_final.model'
-                                )
-                                logger.info(
-                                    f"Saved model at step {global_step} as final model"
-                                )
-                                early_stop = True
-                                break
-                        if mcc > best_mcc:
-                            best_mcc = mcc
-                            torch.save(
-                                checkpoint, args.model_path + '_best_mcc.model'
-                            )
-                            logger.info(f"New best mcc at step {global_step}")
-                        if f1 > best_f1:
-                            best_f1 = f1
-                            torch.save(
-                                checkpoint, args.model_path + '_best_f1.model'
-                            )
-                            logger.info(f"New best f1 at step {global_step}")
-                        if is_final:
-                            torch.save(
-                                checkpoint, args.model_path + '_final.model'
-                            )
+                        return_dict = eval_save_models(
+                            model_architecture,
+                            model.state_dict(),
+                            optimizer.state_dict(),
+                            scheduler.state_dict(),
+                            vocab_file,
+                            subword_vocab_file,
+                            logger,
+                            dev_loss,
+                            mcc,
+                            f1,
+                            best_loss,
+                            best_mcc,
+                            best_f1,
+                            checkpoints_wo_improvement,
+                            is_final,
+                            args.model_path,
+                            config.early_stopping,
+                            global_step,
+                            mode='both'
+                        )
+                        checkpoints_wo_improvement = return_dict[
+                            'checkpoints_wo_improvement']
+                        best_loss = return_dict['best_loss']
+                        best_mcc = return_dict['best_mcc']
+                        best_f1 = return_dict['best_f1']
+                        early_stop = return_dict['early_stop']
+                        if is_final or early_stop:
                             break
 
                 with open(args.model_path + '.csv', 'a+') as data_file:
                     print(', '.join(metrics_list), file=data_file)
-                """
-                # Perform an eval run on the dev data
-                with torch.no_grad():
-                    dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-
-                # Print the current step, batch, learning rate, average time
-                # per batch, training loss, dev f1, and example segmentations
-                # for the current model
-                dev_stat_dict.update(
-                    {
-                        "step": f"{global_step}/{config.max_train_steps}",
-                        "s/batch": time_per_batch,
-                        "lr": round(lr, 5),
-                        "train loss": round(current_train_loss, 3),
-                    }
-                )
-
-                logger.info(statbar_string(dev_stat_dict))
-
-                time_profile_dict = {
-                    "average forward time":
-                        f"{round(mean(checkpoint_stats['forward_time']), 3)}s",
-                    "forward nn":
-                        f"{round(mean(checkpoint_stats['nn_time']), 3)}s",
-                    "forward lattice":
-                        f"{round(mean(checkpoint_stats['lattice_time']), 3)}s",
-                    "backward":
-                        f"{round(mean(checkpoint_stats['backward_time']), 3)}s",
-                    "optimizer":
-                        f"{round(mean(checkpoint_stats['optimizer_time']), 3)}s"
-                }
-
-                logger.info(statbar_string(time_profile_dict))
-
-                print("Sample dev segmentations:")
-                for seg in dev_segmentations[:8]:
-                    print(
-                        "    " +
-                        ' '.join([''.join(segment) for segment in seg])
-                    )
-
-                dev_loss = dev_stat_dict['dev loss']
-                mcc = dev_stat_dict['mcc']
-                f1 = dev_stat_dict['f1']
-
-                metrics = [
-                    global_step, time_per_batch,
-                    round(lr, 7),
-                    round(current_train_loss, 2), dev_loss, mcc, f1,
-                    dev_stat_dict['precision'], dev_stat_dict['recall']
-                ]
-                metrics = [str(m) for m in metrics]
-                with open(args.model_path + '.csv', 'a+') as data_file:
-                    print(', '.join(metrics), file=data_file)
-
-                # If the dev loss from the current checkpoint is better than
-                # the current best, save the current model to a file
-                checkpoint = {
-                    'model_architecture': model_architecture,
-                    'state_dict': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'scheduler': scheduler.state_dict(),
-                    'vocab_file': vocab_file,
-                    'subword_vocab_file': subword_vocab_file
-                }
-                if dev_loss < best_loss:
-                    best_loss = dev_loss
-                    torch.save(checkpoint, args.model_path + '_best_loss.model')
-                    logger.info(f"New best loss at step {global_step}")
-                    checkpoints_wo_improvement = 0
-                else:
-                    checkpoints_wo_improvement += 1
-                    improvement_stopped = (
-                        config.early_stopping and
-                        checkpoints_wo_improvement >= config.early_stopping
-                    )
-                    if improvement_stopped:
-                        logger.info(
-                            f"Stopping early at step {global_step} due to no"
-                            f" dev loss improvement in {config.early_stopping}"
-                            " checkpoints"
-                        )
-                        torch.save(checkpoint, args.model_path + '_final.model')
-                        logger.info(
-                            f"Saved model at step {global_step} as final model"
-                        )
-                        early_stop = True
-                        break
-                if mcc > best_mcc:
-                    best_mcc = mcc
-                    torch.save(checkpoint, args.model_path + '_best_mcc.model')
-                    logger.info(f"New best mcc at step {global_step}")
-                if f1 > best_f1:
-                    best_f1 = f1
-                    torch.save(checkpoint, args.model_path + '_best_f1.model')
-                    logger.info(f"New best f1 at step {global_step}")
-                if is_final:
-                    torch.save(checkpoint, args.model_path + '_final.model')
-                    break
-                """
 
                 # Reset the checkpoint loss and start time
                 checkpoint_start_time = time.time()
