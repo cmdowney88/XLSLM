@@ -42,7 +42,7 @@ DEV_LM_METRICS = ['dev_loss']
 DEV_SEGMENTATION_METRICS = ['mcc', 'f1', 'precision', 'recall']
 ALL_DEV_METRICS = DEV_LM_METRICS + DEV_SEGMENTATION_METRICS
 
-DEV_MODES = ['bpc', 'seg', 'both']
+DEV_MODES = ['both', 'bpc', 'seg']
 DEV_METRICS_BY_MODE = {
     'bpc': DEV_LM_METRICS,
     'seg': DEV_SEGMENTATION_METRICS,
@@ -398,6 +398,8 @@ def process_eval_results(
                 "train loss": round(current_train_loss, 3),
             }
         )
+    
+    if print_sample:
         logger.info(statbar_string(dev_stat_dict))
         print("Sample dev segmentations:")
         for seg in dev_segmentations[:8]:
