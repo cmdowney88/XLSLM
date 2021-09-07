@@ -8,6 +8,8 @@ requires the model to already exist. See ``main()`` for argument details
 
 Authors:
     C.M. Downey (cmdowney@uw.edu)
+    Shannon Drizin (sdrizin@uw.edu)
+    Shivin Thukral (shivin7@uw.edu)
 """
 import argparse
 import gc
