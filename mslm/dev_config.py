@@ -8,16 +8,18 @@ class devConfig():
     def __init__(
         self,
         primary_dev_file=None,
-        primary_dev_mode=None,
-        bpc_secondary_dev_files=None,
-        seg_secondary_dev_files=None,
-        both_secondary_dev_files=None
+        primary_dev_mode='both',
+        bpc_secondary_dev_files=[],
+        seg_secondary_dev_files=[],
+        both_secondary_dev_files=[]
     ):
         self.primary_dev_file = primary_dev_file
         self.primary_dev_mode = primary_dev_mode
-        self.bpc_secondary_dev_files = bpc_secondary_dev_files
-        self.seg_secondary_dev_files = seg_secondary_dev_files
-        self.both_secondary_dev_files = both_secondary_dev_files
+        self.secondary_dev_files = {
+            'bpc': bpc_secondary_dev_files,
+            'seg': seg_secondary_dev_files,
+            'both': both_secondary_dev_files
+        }
 
     @classmethod
     def from_dict(cls, dict_object):
