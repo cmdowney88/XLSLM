@@ -269,8 +269,8 @@ def statbar_string(stat_dict: dict) -> str:
     return ' | '.join(stat_items)
 
 
-def dev_file_load(
-    file_list: List[str], config: dict, vocab: wr.Vocab, pad_idx: int
+def load_dev_files(
+    file_list: List[str], config: MSLMConfig, vocab: wr.Vocab, pad_idx: int
 ) -> Dict:
     """
     Create a DataLoader and gold segmentations for the dev file(s)
@@ -281,61 +281,43 @@ def dev_file_load(
         vocab: The vocabulary created from the training text
         pad_idx: The index for the <pad> token
     """
-    # Tokenize the dev file by characters, adding <bos> and <eos> tags.
-    # Convert text to integer ids based on Vocab, and read into Dataset and
-    # Dataloader
-    dev_texts = []
+    dev_sets = []
+    dev_dataloaders = []
+    all_gold_boundaries = []
+    
+    # Loop over all dev files
     for d_file in file_list:
-        d_text = wr.character_tokenize(
+        # Tokenize the dev file by characters, adding <bos> and <eos> tags,
+        # Convert text to integer ids based on Vocab, and read into Pytorch
+        # Dataset and Dataloader
+        dev_text = wr.character_tokenize(
             d_file, preserve_case=config.preserve_case, edge_tokens=True
         )
-        dev_texts.append(d_text)
-
-    dev_datas = []
-    for d_text in dev_texts:
-        d_data = [vocab.to_ids(line) for line in d_text]
-        dev_datas.append(d_data)
-
-    dev_sets = []
-    for d_data in dev_datas:
-        d_set = VariableLengthDataset(
-            d_data,
+        dev_data = [vocab.to_ids(line) for line in dev_text]
+        dev_set = VariableLengthDataset(
+            dev_data,
             batch_size=config.batch_size,
             pad_value=pad_idx,
             batch_by=config.batch_by,
             max_padding=config.max_padding,
             max_pad_strategy='split'
         )
-        dev_sets.append(d_set)
-
-    dev_dataloaders = []
-    for d_set in dev_sets:
-        d_dataloader = DataLoader(d_set, batch_size=None)
+        dev_sets.append(dev_set)
+        d_dataloader = DataLoader(dev_set, batch_size=None)
         dev_dataloaders.append(d_dataloader)
 
-    gold_dev_texts = []
-    gold_boundaries = []
-    all_gold_boundaries = []
-
-    # Also whitespace-tokenize the dev data, using the spaces to establish
-    # gold-standard segmentations for the dev data, which are converted to a
-    # binary "boundary" vector using get_boundary_vector
-    for d_file in file_list:
-        counter = 0
-        gold_d_text = [
+        # Also whitespace-tokenize the dev data, using the spaces to establish
+        # gold-standard segmentations for the dev data, which are converted to a
+        # binary "boundary" vector using get_boundary_vector
+        gold_dev_text = [
             wr.chars_from_words(sent) for sent in wr.basic_tokenize(
                 d_file, preserve_case=config.preserve_case, split_tags=True
             )
         ]
-        gold_d_text = gold_d_text[:dev_sets[counter].total_num_instances]
-        gold_dev_texts.append(gold_d_text)
-
-        g_boundaries = [get_boundary_vector(ex) for ex in gold_d_text]
-        gold_boundaries.append(g_boundaries)
-
-        all_g_boundaries = np.array(wr.flatten(g_boundaries))
-        all_gold_boundaries.append(all_g_boundaries)
-        counter += 1
+        gold_dev_text = gold_dev_text[dev_set.total_num_instances]
+        g_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
+        flattened_g_boundaries = np.array(wr.flatten(g_boundaries))
+        all_gold_boundaries.append(flattened_g_boundaries)
 
     return {
         'data_loaders': dev_dataloaders,
@@ -520,7 +502,6 @@ def train(args, config, dev_config, device, logger) -> None:
         args.train_file, preserve_case=config.preserve_case, edge_tokens=True
     )
 
-    #
     pretrained_embeddings = None
     char_ids_to_subword_id = None
 
@@ -593,13 +574,13 @@ def train(args, config, dev_config, device, logger) -> None:
 
     # dev file using command line argument
     if args.dev_file:
-        dev_load_dict = dev_file_load([args.dev_file], config, vocab, pad_idx)
+        dev_load_dict = load_dev_files([args.dev_file], config, vocab, pad_idx)
         dev_dataloader = dev_load_dict['data_loaders'][0]
         all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
         dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
     #primary dev file in dev_config
     elif args.dev_config:
-        dev_load_dict = dev_file_load(
+        dev_load_dict = load_dev_files(
             [dev_config.primary_dev_file], config, vocab, pad_idx
         )
         dev_dataloader = dev_load_dict['data_loaders'][0]
@@ -608,34 +589,38 @@ def train(args, config, dev_config, device, logger) -> None:
 
         #bpc mode secondary dev files
         if dev_config.bpc_secondary_dev_files:
-            dev_load_dict = dev_file_load(
+            dev_load_dict = load_dev_files(
                 dev_config.bpc_secondary_dev_files, config, vocab, pad_idx
             )
             bpc_secondary_dev_dataloaders = dev_load_dict['data_loaders']
             bpc_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries']
-            bpc_secondary_dev_set_unsort_pmt = dev_load_dict[
-                'unsort_permutation']
+            bpc_secondary_dev_set_unsort_pmt = (
+                dev_load_dict['unsort_permutation']
+            )
 
         #seg qual mode secondary dev files
         if dev_config.seg_secondary_dev_files:
-            dev_load_dict = dev_file_load(
+            dev_load_dict = load_dev_files(
                 dev_config.seg_secondary_dev_files, config, vocab, pad_idx
             )
             seg_secondary_dev_dataloaders = dev_load_dict['data_loaders']
             seg_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries']
-            seg_secondary_dev_set_unsort_pmt = dev_load_dict[
-                'unsort_permutation']
+            seg_secondary_dev_set_unsort_pmt = (
+                dev_load_dict['unsort_permutation']
+            )
 
         #both mode secondary dev files
         if dev_config.both_secondary_dev_files:
-            dev_load_dict = dev_file_load(
+            dev_load_dict = load_dev_files(
                 dev_config.both_secondary_dev_files, config, vocab, pad_idx
             )
             both_secondary_dev_dataloaders = dev_load_dict['data_loaders']
-            both_secondary_all_gold_boundaries = dev_load_dict['gold_boundaries'
-                                                              ]
-            both_secondary_dev_set_unsort_pmt = dev_load_dict[
-                'unsort_permutation']
+            both_secondary_all_gold_boundaries = (
+                dev_load_dict['gold_boundaries']
+            )
+            both_secondary_dev_set_unsort_pmt = (
+                dev_load_dict['unsort_permutation']
+            )
 
     # If training an existing model, read it from the checkpoint and load in the
     # parameters, else create a new model instantiation based on the input
