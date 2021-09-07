@@ -13,8 +13,22 @@ file, which will have all the prepared lines from each of the dev files/each of
 the train files given as command line arguments (and assumes files will have the
 same name that they do in the AmericasNLP repository, for example, 'dev.cni') 
 """
+import os
 import sys
 from typing import List
+
+URL_SUBSTRINGS = ['www.', 'http', '.com', '.org', '.net', '.co']
+
+
+def line_is_clean(line: str) -> bool:
+    """
+    Return whether the line is clean (doesn't have a url, doesn't have a
+    copyright symbol, has at least one alphabetic character)
+    """
+    no_url = all(sub not in line for sub in URL_SUBSTRINGS)
+    no_copyright = ('©' not in line)
+    has_alpha = any(c.isalpha() for c in line)
+    return no_url and no_copyright and has_alpha
 
 
 def prepare(filename: str) -> List[str]:
@@ -32,9 +46,7 @@ def prepare(filename: str) -> List[str]:
     lines[:] = [x for x in lines if x]
 
     # remove lines with urls and copyright symbols
-    prepared = [
-        line for line in lines if 'www.' not in line and '©' not in line
-    ]
+    prepared = [line for line in lines if line_is_clean(line)]
 
     return prepared
 
@@ -68,11 +80,11 @@ def main():
     # get list of files
     list_of_files = sys.argv[1:]
     dev_files = [filename for filename in list_of_files if 'dev' in filename]
-    dev_files.sort()
+    dev_files.sort(key=lambda x: os.path.splitext(x)[-1])
     train_files = [
         filename for filename in list_of_files if 'train' in filename
     ]
-    train_files.sort()
+    train_files.sort(key=lambda x: os.path.splitext(x)[-1])
 
     # to store lists of prepared lines for the combined dev file and the
     # combined train file

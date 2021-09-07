@@ -9,6 +9,7 @@ Each of the data files will have its stats output to a separate file. There will
 also be a combined stats file with the stats for all of the files combined into
 one stats file, where the stats are separated by the original data file names.
 """
+import os
 import sys
 from typing import Dict, List
 
@@ -156,7 +157,7 @@ def main():
     """
     # get names of files to find stats for
     list_of_files = sys.argv[1:]
-    list_of_files.sort()
+    list_of_files.sort(key=lambda x: os.path.splitext(x)[-1])
 
     # list to store all of the stats dicts to output to combined file
     list_of_stats = []

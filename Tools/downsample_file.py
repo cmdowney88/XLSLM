@@ -6,7 +6,9 @@ def main():
     Script to down-sample a file to a new number of lines, choosing those lines
     randomly without replacement. Random seed defaults to 1
     """
-    parser = argparse.ArgumentParser(description="MBart Translation Script")
+    parser = argparse.ArgumentParser(
+        description="Script to downsample file size"
+    )
     parser.add_argument('--input_file', type=str, required=True)
     parser.add_argument('--new_num_lines', type=int, required=True)
     parser.add_argument('--output_file', type=str, required=True)
