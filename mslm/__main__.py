@@ -326,7 +326,7 @@ def load_dev_files(
                 dev_file, preserve_case=config.preserve_case, split_tags=True
             )
         ]
-        gold_dev_text = gold_dev_text[dev_set.total_num_instances]
+        gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
         g_boundaries = [get_boundary_vector(ex) for ex in gold_dev_text]
         flattened_g_boundaries = np.array(wr.flatten(g_boundaries))
         all_gold_boundaries.append(flattened_g_boundaries)
@@ -586,7 +586,7 @@ def train(args, config, dev_config, device, logger) -> None:
         all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
         dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
     #primary dev file in dev_config
-    elif args.dev_config:
+    else:
         dev_load_dict = load_dev_files(
             [dev_config.primary_dev_file], config, vocab, pad_idx
         )
@@ -600,6 +600,7 @@ def train(args, config, dev_config, device, logger) -> None:
             dev_load_dict = load_dev_files(
                 dev_config.secondary_dev_files[mode], config, vocab, pad_idx
             )
+            secondary_dev_data[mode] = {}
             secondary_dev_data[mode]['dataloaders'] = (
                 dev_load_dict['data_loaders']
             )
@@ -1151,7 +1152,7 @@ def main():
         config = MSLMConfig()
 
     #Read in dev configuration file if one is supplied
-    if args.dev_config:
+    if hasattr(args, "dev_config"):
         dev_config = devConfig.from_json(args.dev_config)
         #If there is a dev config file, it must have a primary dev file
         #and a primary dev mode
@@ -1164,7 +1165,7 @@ def main():
                 f'Primary dev file mode {dev_config.primary_dev_mode} is not valid'
             )
     else:
-        dev_config = None
+        dev_config = devConfig()
 
     # Set the random seed for all necessary packages
     random.seed(config.seed)

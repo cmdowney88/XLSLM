@@ -28,7 +28,14 @@ class devConfig():
         """
         config = devConfig()
         for (key, value) in dict_object.items():
-            config.__dict__[key] = value
+            if key in ['primary_dev_file', 'primary_dev_mode']:
+                config.__dict__[key] = value
+            elif key == 'bpc_secondary_dev_files':
+                config.secondary_dev_files['bpc'] = value
+            elif key == 'seg_secondary_dev_files':
+                config.secondary_dev_files['seg'] = value
+            elif key == 'both_secondary_dev_files':
+                config.secondary_dev_files['both'] = value
         return config
 
     @classmethod
