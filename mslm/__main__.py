@@ -19,6 +19,7 @@ import random
 import sys
 import time
 from collections import defaultdict
+from logging import Logger
 from statistics import mean
 from typing import Dict, List, Tuple
 
@@ -261,9 +262,8 @@ def do_eval(
     # Convert dev loss to log base 2 to represent bits per character
     dev_loss = total_dev_loss / np.log(2)
 
-    # Print out the initial f1 score and some sample segmentations
     stat_dict = {
-        "dev loss": round(dev_loss, 3),
+        "dev_loss": round(dev_loss, 3),
         "mcc": round(mcc, 3),
         "f1": round(100 * f1, 1),
         "precision": round(100 * prec, 1),
@@ -285,7 +285,7 @@ def statbar_string(stat_dict: dict) -> str:
 
 def load_dev_files(
     file_list: List[str], config: MSLMConfig, vocab: wr.Vocab, pad_idx: int
-) -> Dict:
+) -> dict:
     """
     Create a DataLoader and gold segmentations for the dev file(s)
 
@@ -368,110 +368,97 @@ def compute_eval_args(
     return list_eval_args
 
 
-def process_eval_results(
-    eval_args,
-    logger,
-    global_step=0,
-    max_train_steps=0,
-    time_per_batch=0.0,
-    lr=0.0,
-    current_train_loss=0.0,
-    mode='both',
-    print_sample=True
-) -> List[float]:
-    """
-    Perform an eval run and return metrics based on the mode of evaluation
-    """
-    # Perform an eval run on the dev data
-    with torch.no_grad():
-        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+def filter_metrics_by_mode(metric_dict: dict, mode: str) -> dict:
+    return {
+        metric: metric_dict[metric] for metric in DEV_METRICS_BY_MODE[mode]
+    }
 
-    if print_sample and (global_step != 0):
-        # Print the current step, batch, learning rate, average time
-        # per batch, training loss, dev f1, and example segmentations
-        # for the current model
-        dev_stat_dict.update(
+
+def process_checkpoint(
+    eval_args: dict,
+    logger: Logger,
+    primary_dev_mode: str,
+    global_step: int,
+    max_train_steps: int,
+    lr: float,
+    secondary_eval_args: dict = None,
+    time_per_batch: float = None,
+    current_train_loss: float = None,
+    print_sample: bool = True
+) -> Tuple[dict, list]:
+    """
+    Perform and evaluation call on the primary dev file as well as any other
+    secondary dev files. Also return ordered list of values for printing as a
+    csv row. Optionally log checkpoint status and sample segmentations
+    """
+
+    # Initialize the checkpoint status dictionary with the step and learning
+    # rate. Add seconds per batch and training loss if checkpoint is not prior
+    # to training
+    stat_dict = {
+        'step': f"{global_step}/{max_train_steps}", 'lr': round(lr, 5)
+    }
+    if global_step != 0:
+        stat_dict.update(
             {
-                "step": f"{global_step}/{max_train_steps}",
                 "s/batch": time_per_batch,
-                "lr": round(lr, 5),
-                "train loss": round(current_train_loss, 3),
+                "train_loss": round(current_train_loss, 3),
             }
         )
+
+    # Perform an eval call on the primary dev file
+    with torch.no_grad():
+        dev_stat_dict, dev_segmentations = do_eval(**eval_args)
+    dev_csv_values = filter_metrics_by_mode(dev_stat_dict, primary_dev_mode)
+    stat_dict.update(dev_stat_dict)
     
+    # Perform an eval call on each of the secondary dev files
+    if secondary_eval_args:
+        for mode in DEV_MODES:
+            for e_args in secondary_eval_args[mode]:
+                with torch.no_grad():
+                    sec_stat_dict, sec_segmentations = do_eval(**e_args)
+                dev_csv_values += filter_metrics_by_mode(sec_stat_dict, mode)
+    
+    # Optionally print checkpoint statistics and some sample segmentations
     if print_sample:
-        logger.info(statbar_string(dev_stat_dict))
+        logger.info(statbar_string(stat_dict))
         print("Sample dev segmentations:")
         for seg in dev_segmentations[:8]:
             print("    " + ' '.join([''.join(segment) for segment in seg]))
 
-    if mode == 'bpc':
-        metrics = [dev_stat_dict['dev loss']]
-    elif mode == 'seg':
-        metrics = [
-            dev_stat_dict['mcc'], dev_stat_dict['f1'],
-            dev_stat_dict['precision'], dev_stat_dict['recall']
-        ]
-    else:
-        metrics = [
-            dev_stat_dict['dev loss'], dev_stat_dict['mcc'],
-            dev_stat_dict['f1'], dev_stat_dict['precision'],
-            dev_stat_dict['recall']
-        ]
-
-    return metrics
+    return stat_dict, dev_csv_values
 
 
-def eval_save_models(
-    model_architecture,
-    model_state_dict,
-    optimizer_state_dict,
-    scheduler_state_dict,
-    vocab_file,
-    subword_vocab_file,
-    logger,
-    dev_loss,
-    mcc,
-    f1,
-    best_loss,
-    best_mcc,
-    best_f1,
-    checkpoints_wo_improvement,
-    is_final,
-    args_model_path,
-    config_early_stopping,
-    global_step,
-    mode='both'
+def track_and_save_best_model(
+    model_status_dict: dict,
+    model_checkpoint: dict,
+    args_model_path: str,
+    current_metric_dict: dict,
+    global_step: int,
+    config_early_stopping: int,
+    is_final: bool,
+    logger: Logger,
+    dev_mode: str = 'both'
 ):
-
-    return_dict = {
-        'checkpoints_wo_improvement': checkpoints_wo_improvement,
-        'best_loss': best_loss,
-        'best_mcc': best_mcc,
-        'best_f1': best_f1,
-        'early_stop': False
-    }
-
-    # If the dev loss from the current checkpoint is better than
-    # the current best, save the current model to a file
-    checkpoint = {
-        'model_architecture': model_architecture,
-        'state_dict': model_state_dict,
-        'optimizer': optimizer_state_dict,
-        'scheduler': scheduler_state_dict,
-        'vocab_file': vocab_file,
-        'subword_vocab_file': subword_vocab_file
-    }
-    if dev_loss < return_dict['best_loss']:
-        return_dict['best_loss'] = dev_loss
-        torch.save(checkpoint, args_model_path + '_best_loss.model')
+    dev_loss = current_metric_dict['dev_loss']
+    mcc = current_metric_dict['mcc']
+    f1 = current_metric_dict['f1']
+    
+    # Check if the current checkpoint dev loss is lower than the over best loss.
+    # If so, save the model and reset `checkpoints_wo_improvement`. If not,
+    # increment the counter of checkpoints without improvement, and check if the
+    # early stopping criterion is met
+    if dev_loss < model_status_dict['best_loss']:
+        model_status_dict['best_loss'] = dev_loss
+        torch.save(model_checkpoint, args_model_path + '_best_loss.model')
         logger.info(f"New best loss at step {global_step}")
-        return_dict['checkpoints_wo_improvement'] = 0
+        model_status_dict['checkpoints_wo_improvement'] = 0
     else:
-        return_dict['checkpoints_wo_improvement'] += 1
+        model_status_dict['checkpoints_wo_improvement'] += 1
         improvement_stopped = (
             config_early_stopping and
-            return_dict['checkpoints_wo_improvement'] >= config_early_stopping
+            model_status_dict['checkpoints_wo_improvement'] >= config_early_stopping
         )
         if improvement_stopped:
             logger.info(
@@ -479,22 +466,28 @@ def eval_save_models(
                 f" dev loss improvement in {config_early_stopping}"
                 " checkpoints"
             )
-            torch.save(checkpoint, args_model_path + '_final.model')
+            torch.save(model_checkpoint, args_model_path + '_final.model')
             logger.info(f"Saved model at step {global_step} as final model")
-            return_dict['early_stop'] = True
-            return return_dict
-    if mode != 'bpc' and (mcc > return_dict['best_mcc']):
-        return_dict['best_mcc'] = mcc
-        torch.save(checkpoint, args_model_path + '_best_mcc.model')
+            model_status_dict['early_stop'] = True
+            return model_status_dict
+    
+    # If not in bpc-only dev mode, compare the current checkpoint dev mcc/f1 to
+    # the best mcc/f1 and save the model if it is better
+    if dev_mode != 'bpc' and (mcc > model_status_dict['best_mcc']):
+        model_status_dict['best_mcc'] = mcc
+        torch.save(model_checkpoint, args_model_path + '_best_mcc.model')
         logger.info(f"New best mcc at step {global_step}")
-    if mode != 'bpc' and (f1 > return_dict['best_f1']):
-        return_dict['best_f1'] = f1
-        torch.save(checkpoint, args_model_path + '_best_f1.model')
+    if dev_mode != 'bpc' and (f1 > model_status_dict['best_f1']):
+        model_status_dict['best_f1'] = f1
+        torch.save(model_checkpoint, args_model_path + '_best_f1.model')
         logger.info(f"New best f1 at step {global_step}")
+    
+    # If this is the final checkpoint, save the model
     if is_final:
-        torch.save(checkpoint, args_model_path + '_final.model')
+        torch.save(model_checkpoint, args_model_path + '_final.model')
 
-    return return_dict
+    # Return the updated model status dictionary
+    return model_status_dict
 
 
 # ------------------------------------------------------------------------------
@@ -589,7 +582,7 @@ def train(args, config, dev_config, device, logger) -> None:
         dev_dataloader = dev_load_dict['data_loaders'][0]
         all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
         dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
-    #primary dev file in dev_config
+    # primary dev file in dev_config
     else:
         dev_load_dict = load_dev_files(
             [dev_config.primary_dev_file], config, vocab, pad_idx
@@ -598,7 +591,7 @@ def train(args, config, dev_config, device, logger) -> None:
         all_gold_boundaries = dev_load_dict['gold_boundaries'][0]
         dev_set_unsort_pmt = dev_load_dict['unsort_permutation'][0]
 
-        #bpc mode secondary dev files
+        # bpc mode secondary dev files
         secondary_dev_data = {}
         for mode in DEV_MODES:
             dev_load_dict = load_dev_files(
@@ -720,7 +713,7 @@ def train(args, config, dev_config, device, logger) -> None:
     with open(args.model_path + '.csv', 'w+') as data_file:
         print(', '.join(metric_file_headers), file=data_file)
 
-    #Make eval_args
+    # Make eval_args
     if args.dev_file:
         eval_args = compute_eval_args(
             model, [dev_dataloader], device, config.max_seg_length, eoseg_idx,
@@ -729,7 +722,7 @@ def train(args, config, dev_config, device, logger) -> None:
         )[0]
 
     elif args.dev_config:
-        #primary dev file
+        # primary dev file
         eval_args = compute_eval_args(
             model, [dev_dataloader], device, config.max_seg_length, eoseg_idx,
             char_ids_to_subword_id, vocab, [all_gold_boundaries],
@@ -757,45 +750,40 @@ def train(args, config, dev_config, device, logger) -> None:
     }
 
     # Initialize base metrics and counters, begin training
-    best_loss = float("inf")
-    best_f1 = 0
-    best_mcc = -1
+    model_status_dict = {
+        'best_loss': float('inf'),
+        'best_f1': 0.0,
+        'best_mcc': -1.0,
+        'checkpoints_wo_improvement': 0,
+        'early_stop': False
+    }
     forward_batch = 0
     global_step = 0
-    checkpoints_wo_improvement = 0
-    early_stop = False
 
     logger.info(f"Starting Training")
     model.train()
 
-    while global_step < config.max_train_steps and not early_stop:
-
+    while (
+        global_step < config.max_train_steps
+        and not model_status_dict['early_stop']
+    ):
         # At the very beginning of training, do an eval run and record baseline
         # metrics, writing to the output metric file
         if global_step == 0:
-            metric_values = [
-                str(metric) for metric in [
-                    global_step, "n/a",
-                    round(scheduler.get_last_lr()[0], 7), "n/a"
-                ]
-            ]
-            if args.dev_file:
-                metrics = process_eval_results(eval_args, logger)
-                metric_values += [str(m) for m in metrics]
-            else:
-                metrics = process_eval_results(
-                    eval_args, logger, mode=dev_config.primary_dev_mode
-                )
-                metric_values += [str(m) for m in metrics]
-                for mode in DEV_MODES:
-                    for e_args in secondary_eval_args[mode]:
-                        metrics = process_eval_results(
-                            e_args, logger, mode=mode, print_sample=False
-                        )
-                        metric_values += [str(m) for m in metrics]
-
+            initial_lr = round(scheduler.get_last_lr()[0], 8)
+            csv_values = [global_step, "n/a", initial_lr, "n/a"]
+            _, dev_csv_values = process_checkpoint(
+                eval_args=eval_args,
+                logger=logger,
+                primary_dev_mode=dev_config.primary_dev_mode,
+                global_step=global_step,
+                max_train_steps=config.max_train_steps,
+                lr=initial_lr,
+                secondary_eval_args=secondary_eval_args
+            )
+            csv_values = [str(v) for v in csv_values + dev_csv_values]
             with open(args.model_path + '.csv', 'a+') as data_file:
-                print(', '.join(metric_values), file=data_file)
+                print(', '.join(csv_values), file=data_file)
 
             checkpoint_start_time = time.time()
             checkpoint_stats = defaultdict(list)
@@ -879,114 +867,55 @@ def train(args, config, dev_config, device, logger) -> None:
                 }
                 logger.info(statbar_string(time_profile_dict))
 
-                # Initialize the metrics list with fixed parameters
-                metric_values = [
-                    str(metric) for metric in [
-                        global_step, time_per_batch,
-                        round(lr, 7),
-                        round(current_train_loss, 2)
-                    ]
+                # Initialize the metrics list with the values from the previous
+                # training batch
+                csv_values = [
+                    global_step, time_per_batch, round(lr, 8),
+                    round(current_train_loss, 2)
                 ]
 
-                if args.dev_file:
-                    metrics = process_eval_results(
-                        eval_args, logger, global_step, config.max_train_steps,
-                        time_per_batch, lr, current_train_loss
-                    )
-                    metric_values += [str(m) for m in metrics]
-                    dev_loss, mcc, f1 = metrics[0], metrics[1], metrics[2]
+                # Get the checkpoint metric dictionary and csv values by
+                # conducting evaluation on the dev files
+                metric_dict, dev_csv_values = process_checkpoint(
+                    eval_args=eval_args,
+                    logger=logger,
+                    primary_dev_mode=dev_config.primary_dev_mode,
+                    global_step=global_step,
+                    max_train_steps=config.max_train_steps,
+                    lr=lr,
+                    secondary_eval_args=secondary_eval_args
+                )
+                csv_values = [str(v) for v in csv_values + dev_csv_values]
 
-                    return_dict = eval_save_models(
-                        model_architecture, model.state_dict(),
-                        optimizer.state_dict(), scheduler.state_dict(),
-                        vocab_file, subword_vocab_file, logger, dev_loss, mcc,
-                        f1, best_loss, best_mcc, best_f1,
-                        checkpoints_wo_improvement, is_final, args.model_path,
-                        config.early_stopping, global_step
-                    )
-                    checkpoints_wo_improvement = (
-                        return_dict['checkpoints_wo_improvement']
-                    )
-                    best_loss = return_dict['best_loss']
-                    best_mcc = return_dict['best_mcc']
-                    best_f1 = return_dict['best_f1']
-                    early_stop = return_dict['early_stop']
-                    if is_final or early_stop:
-                        break
-
-                elif args.dev_config:
-                    sec_metric_values = []
-                    for mode in DEV_MODES:
-                        for e_args in secondary_eval_args[mode]:
-                            metrics = process_eval_results(
-                                e_args,
-                                logger,
-                                global_step,
-                                mode=mode,
-                                print_sample=False
-                            )
-                            sec_metric_values += [str(m) for m in metrics]
-
-                    metrics = process_eval_results(
-                        eval_args,
-                        logger,
-                        global_step,
-                        config.max_train_steps,
-                        time_per_batch,
-                        lr,
-                        current_train_loss,
-                        mode=dev_config.primary_dev_mode
-                    )
-                    metric_values += [
-                        str(m) for m in metrics
-                    ] + sec_metric_values
-
-                    if dev_config.primary_dev_mode == 'bpc':
-                        dev_loss = metrics[0]
-                        mcc = None
-                        f1 = None
-                    elif dev_config.primary_dev_mode == 'seg':
-                        dev_loss = None
-                        mcc = metrics[0]
-                        f1 = metrics[1]
-                    else:
-                        dev_loss = metrics[0]
-                        mcc = metrics[1]
-                        f1 = metrics[2]
-                        
-                    return_dict = eval_save_models(
-                        model_architecture,
-                        model.state_dict(),
-                        optimizer.state_dict(),
-                        scheduler.state_dict(),
-                        vocab_file,
-                        subword_vocab_file,
-                        logger,
-                        dev_loss,
-                        mcc,
-                        f1,
-                        best_loss,
-                        best_mcc,
-                        best_f1,
-                        checkpoints_wo_improvement,
-                        is_final,
-                        args.model_path,
-                        config.early_stopping,
-                        global_step,
-                        mode=dev_config.primary_dev_mode
-                    )
-                    checkpoints_wo_improvement = (
-                        return_dict['checkpoints_wo_improvement']
-                    )
-                    best_loss = return_dict['best_loss']
-                    best_mcc = return_dict['best_mcc']
-                    best_f1 = return_dict['best_f1']
-                    early_stop = return_dict['early_stop']
-                    if is_final or early_stop:
-                        break
+                # Get a snapshot of the current model, update its status based
+                # on the metrics from the dev checkpoint, and save the
+                # checkpoint if it optimizes any metric
+                model_checkpoint = {
+                    'model_architecture': model_architecture,
+                    'state_dict': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'scheduler': scheduler.state_dict(),
+                    'vocab_file': vocab_file,
+                    'subword_vocab_file': subword_vocab_file
+                }
+                model_status_dict = track_and_save_best_model(
+                    model_status_dict=model_status_dict,
+                    model_checkpoint=model_checkpoint,
+                    args_model_path=args.model_path,
+                    current_metric_dict=metric_dict,
+                    global_step=global_step,
+                    config_early_stopping=config.early_stopping,
+                    is_final=is_final,
+                    logger=logger,
+                    dev_mode=dev_config.primary_dev_mode
+                )
 
                 with open(args.model_path + '.csv', 'a+') as data_file:
-                    print(', '.join(metric_values), file=data_file)
+                    print(', '.join(csv_values), file=data_file)
+
+                # Break when the stopping condition is met
+                if is_final or model_status_dict['early_stop']:
+                    break
 
                 # Reset the checkpoint loss and start time
                 checkpoint_start_time = time.time()
@@ -1142,7 +1071,7 @@ def main():
     args = parser.parse_args()
     args.preexisting_model = bool(args.preexisting_model)
 
-    #Make sure user uses either dev_file or dev_config, not both or neither
+    # Make sure user uses either dev_file or dev_config, not both or neither
     if args.dev_file and args.dev_config:
         raise ValueError(f'Only use --dev_file or --dev_config, not both')
     if not args.dev_file and not args.dev_config:
@@ -1155,7 +1084,7 @@ def main():
     else:
         config = MSLMConfig()
 
-    #Read in dev configuration file if one is supplied
+    # Read in dev configuration file if one is supplied
     if hasattr(args, "dev_config"):
         dev_config = devConfig.from_json(args.dev_config)
         #If there is a dev config file, it must have a primary dev file
