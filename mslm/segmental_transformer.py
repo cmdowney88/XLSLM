@@ -32,10 +32,12 @@ class SegmentalTransformerEncoder(nn.Module):
         n_head: int,
         n_layers: int,
         ffwd_dim: int = 256,
-        dropout: float = 0.1
+        dropout: float = 0.1,
+        kv_feedforward: bool = True
     ):
         super().__init__()
         self.ffwd_dim = ffwd_dim
+        self.kv_feedforward = kv_feedforward
         self.primary_encoder = InitialSpanEncoder(
             d_model, n_head, dim_feedforward=self.ffwd_dim, dropout=dropout
         )
@@ -47,6 +49,9 @@ class SegmentalTransformerEncoder(nn.Module):
             self.subsequent_layers = _get_clones(
                 subsequent_encoder, self.n_layers
             )
+            if self.kv_feedforward:
+                kv_ffwd = nn.Linear(d_model, d_model)
+                self.kv_ffwds = _get_clones(kv_ffwd, self.n_layers)
         else:
             self.subsequent_layers = None
         self.norm = nn.LayerNorm(d_model)
@@ -78,6 +83,8 @@ class SegmentalTransformerEncoder(nn.Module):
             src, attn_mask=attn_mask, padding_mask=padding_mask
         )
         for i in range(self.n_layers):
+            if self.kv_feedforward:
+                src = torch.tanh(self.kv_ffwds[i](src))
             output = self.subsequent_layers[i](
                 output, src, attn_mask=attn_mask, padding_mask=padding_mask
             )
