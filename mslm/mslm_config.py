@@ -11,6 +11,7 @@ class MSLMConfig():
         seed=1,
         clear_cache_by_batch=False,
         preserve_case=False,
+        split_tags=False,
         model_dim=256,
         model_dropout=0.1,
         pretrained_embedding=None,
@@ -49,6 +50,7 @@ class MSLMConfig():
         self.seed = seed
         self.clear_cache_by_batch = clear_cache_by_batch
         self.preserve_case = preserve_case
+        self.split_tags = split_tags
         self.model_dim = model_dim
         self.model_dropout = model_dropout
         self.pretrained_embedding = pretrained_embedding

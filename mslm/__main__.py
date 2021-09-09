@@ -305,7 +305,7 @@ def load_dev_files(
         # Convert text to integer ids based on Vocab, and read into Pytorch
         # Dataset and Dataloader
         dev_text = wr.character_tokenize(
-            dev_file, preserve_case=config.preserve_case, edge_tokens=True
+            dev_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
         )
         dev_data = [vocab.to_ids(line) for line in dev_text]
         dev_set = VariableLengthDataset(
@@ -325,7 +325,7 @@ def load_dev_files(
         # binary "boundary" vector using get_boundary_vector
         gold_dev_text = [
             wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                dev_file, preserve_case=config.preserve_case, split_tags=True
+                dev_file, preserve_case=config.preserve_case, split_tags=config.split_tags
             )
         ]
         gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
@@ -409,7 +409,7 @@ def process_checkpoint(
     # Perform an eval call on the primary dev file
     with torch.no_grad():
         dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-    dev_csv_values = filter_metrics_by_mode(dev_stat_dict, primary_dev_mode)
+    dev_csv_values = [v for k, v in filter_metrics_by_mode(dev_stat_dict, primary_dev_mode).items()]
     stat_dict.update(dev_stat_dict)
     
     # Perform an eval call on each of the secondary dev files
@@ -418,7 +418,7 @@ def process_checkpoint(
             for e_args in secondary_eval_args[mode]:
                 with torch.no_grad():
                     sec_stat_dict, sec_segmentations = do_eval(**e_args)
-                dev_csv_values += filter_metrics_by_mode(sec_stat_dict, mode)
+                dev_csv_values += [v for k, v in filter_metrics_by_mode(sec_stat_dict, mode).items()]
     
     # Optionally print checkpoint statistics and some sample segmentations
     if print_sample:
@@ -503,7 +503,7 @@ def train(args, config, dev_config, device, logger) -> None:
     # Tokenize the train file by characters, adding <bos> and <eos>
     # tags
     train_text = wr.character_tokenize(
-        args.train_file, preserve_case=config.preserve_case, edge_tokens=True
+        args.train_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
     )
 
     pretrained_embeddings = None
@@ -883,7 +883,9 @@ def train(args, config, dev_config, device, logger) -> None:
                     global_step=global_step,
                     max_train_steps=config.max_train_steps,
                     lr=lr,
-                    secondary_eval_args=secondary_eval_args
+                    secondary_eval_args=secondary_eval_args,
+                    time_per_batch=time_per_batch,
+                    current_train_loss=round(current_train_loss, 2)
                 )
                 csv_values = [str(v) for v in csv_values + dev_csv_values]
 
@@ -945,7 +947,7 @@ def predict(args, config, device, logger):
     model.eval()
 
     input_text = wr.character_tokenize(
-        args.input_file, preserve_case=config.preserve_case, edge_tokens=True
+        args.input_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
     )
     input_data = [vocab.to_ids(line) for line in input_text]
     num_lines = len(input_data)
