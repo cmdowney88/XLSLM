@@ -8,8 +8,8 @@ python Tools/file_stats.py \
     Data/AmericasNLP/Bribri/dev.bzd \
     Data/AmericasNLP/Ashaninka/train.cni \
     Data/AmericasNLP/Ashaninka/dev.cni \
-    Data/AmericasNLP/Ashaninka/train.mono.cni \
-    Data/AmericasNLP/Ashaninka/dev.mono.cni \
+    Data/AmericasNLP/Ashaninka/train_1.mono.cni \
+    Data/AmericasNLP/Ashaninka/train_2.mono.cni \
     Data/AmericasNLP/Guarani/train.gug \
     Data/AmericasNLP/Guarani/dev.gug \
     Data/AmericasNLP/Wixarika/train.hch \
@@ -23,8 +23,8 @@ python Tools/file_stats.py \
     Data/AmericasNLP/Quechua/dev.quy \
     Data/AmericasNLP/ShipiboKonibo/train.shp \
     Data/AmericasNLP/ShipiboKonibo/dev.shp \
-    Data/AmericasNLP/ShipiboKonibo/train.mono.shp \
-    Data/AmericasNLP/ShipiboKonibo/dev.mono.shp \
+    Data/AmericasNLP/ShipiboKonibo/train_1.mono.shp \
+    Data/AmericasNLP/ShipiboKonibo/train_2.mono.shp \
     Data/AmericasNLP/Raramuri/train.tar \
     Data/AmericasNLP/Raramuri/dev.tar \
     Data/AmericasNLP/train.anlp \
