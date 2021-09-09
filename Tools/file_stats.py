@@ -31,7 +31,7 @@ def get_stats(filename: str) -> Dict[str, str]:
         stats.
     """
     # dictionary to store stats on data
-    stats_dict = {'Filename': filename}
+    stats_dict = {'Filename': os.path.basename(filename)}
 
     # open file and get lines
     lines = [line.strip().lower() for line in open(filename, 'r')]

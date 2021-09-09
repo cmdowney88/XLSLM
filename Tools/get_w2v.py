@@ -12,13 +12,13 @@ output_file = sys.argv[5]
 
 lines = wr.character_tokenize(input_file)
 
-model = Word2Vec(min_count=1, window=window_size, size=embedding_size, workers=4)
+model = Word2Vec(min_count=1, window=window_size, vector_size=embedding_size, workers=4)
 model.build_vocab(lines)
 model.train(lines, total_examples=model.corpus_count, epochs=num_epochs)
 
 vocab = {}
 vectors = []
-for i, item in enumerate(model.wv.index2word):
+for i, item in enumerate(model.wv.index_to_key):
     vocab[item] = i
     vectors.append(model.wv[item])
 vectors = np.array(vectors)

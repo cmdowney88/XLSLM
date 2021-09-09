@@ -1,12 +1,12 @@
 Filename: dev.anlp
-Number of lines: 10495
-Total number of tokens: 90840
-Number of unique tokens: 31812
-Total number of characters in file: 567166
-Total number of characters in unique tokens: 275655
+Number of lines: 9122
+Total number of tokens: 79901
+Number of unique tokens: 27597
+Total number of characters in file: 485179
+Total number of characters in unique tokens: 233929
 Total number of unique characters: 105
-Average token length of all tokens in file: 6.24
-Average token length of all unique tokens in file: 8.67
+Average token length of all tokens in file: 6.07
+Average token length of all unique tokens in file: 8.48
 
 Filename: dev.aym
 Number of lines: 996
@@ -37,16 +37,6 @@ Total number of characters in unique tokens: 33100
 Total number of unique characters: 63
 Average token length of all tokens in file: 8.8
 Average token length of all unique tokens in file: 10.68
-
-Filename: dev.mono.cni
-Number of lines: 593
-Total number of tokens: 4515
-Number of unique tokens: 2325
-Total number of characters in file: 42093
-Total number of characters in unique tokens: 25736
-Total number of unique characters: 41
-Average token length of all tokens in file: 9.32
-Average token length of all unique tokens in file: 11.07
 
 Filename: dev.gug
 Number of lines: 995
@@ -108,16 +98,6 @@ Total number of unique characters: 65
 Average token length of all tokens in file: 6.02
 Average token length of all unique tokens in file: 8.04
 
-Filename: dev.mono.shp
-Number of lines: 780
-Total number of tokens: 6424
-Number of unique tokens: 2618
-Total number of characters in file: 39894
-Total number of characters in unique tokens: 20717
-Total number of unique characters: 39
-Average token length of all tokens in file: 6.21
-Average token length of all unique tokens in file: 7.91
-
 Filename: dev.tar
 Number of lines: 995
 Total number of tokens: 10377
@@ -129,24 +109,24 @@ Average token length of all tokens in file: 5.36
 Average token length of all unique tokens in file: 7.06
 
 Filename: train.anlp
-Number of lines: 257834
-Total number of tokens: 2671670
-Number of unique tokens: 398905
-Total number of characters in file: 18900466
-Total number of characters in unique tokens: 4222872
+Number of lines: 259207
+Total number of tokens: 2682609
+Number of unique tokens: 400830
+Total number of characters in file: 18982453
+Total number of characters in unique tokens: 4245043
 Total number of unique characters: 253
-Average token length of all tokens in file: 7.07
+Average token length of all tokens in file: 7.08
 Average token length of all unique tokens in file: 10.59
 
 Filename: train_balanced.anlp
-Number of lines: 170457
-Total number of tokens: 1828692
-Number of unique tokens: 318406
-Total number of characters in file: 11899024
-Total number of characters in unique tokens: 3179922
+Number of lines: 171830
+Total number of tokens: 1839631
+Number of unique tokens: 320331
+Total number of characters in file: 11981011
+Total number of characters in unique tokens: 3202093
 Total number of unique characters: 241
 Average token length of all tokens in file: 6.51
-Average token length of all unique tokens in file: 9.99
+Average token length of all unique tokens in file: 10.0
 
 Filename: train.aym
 Number of lines: 6424
@@ -178,7 +158,7 @@ Total number of unique characters: 65
 Average token length of all tokens in file: 8.91
 Average token length of all unique tokens in file: 10.59
 
-Filename: train.mono.cni
+Filename: train_1.mono.cni
 Number of lines: 12010
 Total number of tokens: 99329
 Number of unique tokens: 27963
@@ -187,6 +167,16 @@ Total number of characters in unique tokens: 322945
 Total number of unique characters: 48
 Average token length of all tokens in file: 9.26
 Average token length of all unique tokens in file: 11.55
+
+Filename: train_2.mono.cni
+Number of lines: 593
+Total number of tokens: 4515
+Number of unique tokens: 2325
+Total number of characters in file: 42093
+Total number of characters in unique tokens: 25736
+Total number of unique characters: 41
+Average token length of all tokens in file: 9.32
+Average token length of all unique tokens in file: 11.07
 
 Filename: train.gug
 Number of lines: 26002
@@ -258,7 +248,7 @@ Total number of unique characters: 56
 Average token length of all tokens in file: 6.32
 Average token length of all unique tokens in file: 8.41
 
-Filename: train.mono.shp
+Filename: train_1.mono.shp
 Number of lines: 22029
 Total number of tokens: 205866
 Number of unique tokens: 29534
@@ -267,6 +257,16 @@ Total number of characters in unique tokens: 255206
 Total number of unique characters: 61
 Average token length of all tokens in file: 5.96
 Average token length of all unique tokens in file: 8.64
+
+Filename: train_2.mono.shp
+Number of lines: 780
+Total number of tokens: 6424
+Number of unique tokens: 2618
+Total number of characters in file: 39894
+Total number of characters in unique tokens: 20717
+Total number of unique characters: 39
+Average token length of all tokens in file: 6.21
+Average token length of all unique tokens in file: 7.91
 
 Filename: train.tar
 Number of lines: 14720
