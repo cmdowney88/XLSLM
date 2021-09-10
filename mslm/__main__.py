@@ -305,7 +305,7 @@ def load_dev_files(
         # Convert text to integer ids based on Vocab, and read into Pytorch
         # Dataset and Dataloader
         dev_text = wr.character_tokenize(
-            dev_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
+            dev_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
         )
         dev_data = [vocab.to_ids(line) for line in dev_text]
         dev_set = VariableLengthDataset(
@@ -324,8 +324,10 @@ def load_dev_files(
         # gold-standard segmentations for the dev data, which are converted to a
         # binary "boundary" vector using get_boundary_vector
         gold_dev_text = [
-            wr.chars_from_words(sent) for sent in wr.basic_tokenize(
-                dev_file, preserve_case=config.preserve_case, split_tags=config.split_tags
+            wr.chars_from_words(sent, preserve_tags=config.preserve_tags)
+            for sent in wr.basic_tokenize(
+                dev_file, preserve_case=config.preserve_case,
+                split_tags=config.split_tags
             )
         ]
         gold_dev_text = gold_dev_text[:dev_set.total_num_instances]
@@ -503,7 +505,7 @@ def train(args, config, dev_config, device, logger) -> None:
     # Tokenize the train file by characters, adding <bos> and <eos>
     # tags
     train_text = wr.character_tokenize(
-        args.train_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
+        args.train_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
     )
 
     pretrained_embeddings = None
@@ -947,7 +949,7 @@ def predict(args, config, device, logger):
     model.eval()
 
     input_text = wr.character_tokenize(
-        args.input_file, preserve_case=config.preserve_case, edge_tokens=True, split_tags=config.split_tags
+        args.input_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
     )
     input_data = [vocab.to_ids(line) for line in input_text]
     num_lines = len(input_data)
@@ -964,10 +966,10 @@ def predict(args, config, device, logger):
     # gold-standard segmentations for the dev data, which are converted to a
     # binary "boundary" vector using get_boundary_vector
     gold_input_text = [
-        wr.chars_from_words(sent) for sent in wr.basic_tokenize(
+        wr.chars_from_words(sent, preserve_tags=config.preserve_tags) for sent in wr.basic_tokenize(
             args.input_file,
             preserve_case=config.preserve_case,
-            split_tags=True
+            split_tags=config.split_tags
         )
     ]
     gold_boundaries = [get_boundary_vector(ex) for ex in gold_input_text]
