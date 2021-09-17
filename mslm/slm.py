@@ -88,13 +88,13 @@ class SegmentalLanguageModel(nn.Module):
             self.encoder_dim, self.model_dim
         )
         self.encoding_to_h = nn.Linear(self.encoder_dim, self.model_dim)
+        self.coupling_dropout = nn.Dropout(p=self.model_dropout)
 
         # Initialize the decoder from the model parameters
         self.decoder = SLMDecoder(
             self.model_dim,
             self.num_dec_layers,
-            self.vocab_size,
-            dropout=self.model_dropout
+            self.vocab_size
         )
 
         initrange = 0.1
@@ -284,10 +284,12 @@ class SegmentalLanguageModel(nn.Module):
         # Use the context encodings to create start symbols and initial hidden
         # states for the segment decoder, as well as the lexicon probabilities,
         # if it is being used
-        all_start_symbols = torch.tanh(
-            self.encoding_to_start_symbol(encoder_output)
+        all_start_symbols = self.coupling_dropout(
+            torch.tanh(self.encoding_to_start_symbol(encoder_output))
         )
-        all_h = torch.tanh(self.encoding_to_h(encoder_output))
+        all_h = self.coupling_dropout(
+            torch.tanh(self.encoding_to_h(encoder_output))
+        )
         if self.use_lexicon:
             all_subword_probs, all_lex_proportions = self.lexicon(
                 encoder_output
@@ -918,11 +920,10 @@ class SLMDecoder(nn.Module):
         d_model: int,
         num_dec_layers: int,
         vocab_size: int,
-        dropout: float = 0.1,
+        dropout: int = 0.1,
         initrange: float = 0.1
     ):
         super().__init__()
-        self.input_dropout = nn.Dropout(p=dropout)
         self.segment_lstm = nn.LSTM(
             d_model, d_model, num_layers=num_dec_layers, dropout=dropout
         )
@@ -940,7 +941,6 @@ class SLMDecoder(nn.Module):
                 of each segment
             inits: The initial hidden and cell states for the lstm
         """
-        x = self.input_dropout(x)
         decoder_output, _ = self.segment_lstm(x, inits)
         decoder_output = self.hidden_to_vocab(decoder_output)
         return decoder_output
