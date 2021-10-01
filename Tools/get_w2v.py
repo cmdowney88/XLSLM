@@ -10,7 +10,7 @@ embedding_size = int(sys.argv[3])
 num_epochs = int(sys.argv[4])
 output_file = sys.argv[5]
 
-lines = wr.character_tokenize(input_file)
+lines = wr.character_tokenize(input_file, preserve_tags=False)
 
 model = Word2Vec(min_count=1, window=window_size, vector_size=embedding_size, workers=4)
 model.build_vocab(lines)
