@@ -298,14 +298,17 @@ def load_dev_files(
     dev_sets = []
     dev_dataloaders = []
     all_gold_boundaries = []
-    
+
     # Loop over all dev files
     for dev_file in file_list:
         # Tokenize the dev file by characters, adding <bos> and <eos> tags,
         # Convert text to integer ids based on Vocab, and read into Pytorch
         # Dataset and Dataloader
         dev_text = wr.character_tokenize(
-            dev_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
+            dev_file,
+            preserve_case=config.preserve_case,
+            edge_tokens=True,
+            preserve_tags=config.preserve_tags
         )
         dev_data = [vocab.to_ids(line) for line in dev_text]
         dev_set = VariableLengthDataset(
@@ -326,7 +329,8 @@ def load_dev_files(
         gold_dev_text = [
             wr.chars_from_words(sent, preserve_tags=config.preserve_tags)
             for sent in wr.basic_tokenize(
-                dev_file, preserve_case=config.preserve_case,
+                dev_file,
+                preserve_case=config.preserve_case,
                 split_tags=config.split_tags
             )
         ]
@@ -371,9 +375,7 @@ def compute_eval_args(
 
 
 def filter_metrics_by_mode(metric_dict: dict, mode: str) -> dict:
-    return {
-        metric: metric_dict[metric] for metric in DEV_METRICS_BY_MODE[mode]
-    }
+    return {metric: metric_dict[metric] for metric in DEV_METRICS_BY_MODE[mode]}
 
 
 def process_checkpoint(
@@ -397,9 +399,7 @@ def process_checkpoint(
     # Initialize the checkpoint status dictionary with the step and learning
     # rate. Add seconds per batch and training loss if checkpoint is not prior
     # to training
-    stat_dict = {
-        'step': f"{global_step}/{max_train_steps}", 'lr': round(lr, 5)
-    }
+    stat_dict = {'step': f"{global_step}/{max_train_steps}", 'lr': round(lr, 5)}
     if global_step != 0:
         stat_dict.update(
             {
@@ -411,17 +411,25 @@ def process_checkpoint(
     # Perform an eval call on the primary dev file
     with torch.no_grad():
         dev_stat_dict, dev_segmentations = do_eval(**eval_args)
-    dev_csv_values = [v for k, v in filter_metrics_by_mode(dev_stat_dict, primary_dev_mode).items()]
+    dev_csv_values = [
+        v for k, v in filter_metrics_by_mode(
+            dev_stat_dict, primary_dev_mode
+        ).items()
+    ]
     stat_dict.update(dev_stat_dict)
-    
+
     # Perform an eval call on each of the secondary dev files
     if secondary_eval_args:
         for mode in DEV_MODES:
             for e_args in secondary_eval_args[mode]:
                 with torch.no_grad():
                     sec_stat_dict, sec_segmentations = do_eval(**e_args)
-                dev_csv_values += [v for k, v in filter_metrics_by_mode(sec_stat_dict, mode).items()]
-    
+                dev_csv_values += [
+                    v for k, v in filter_metrics_by_mode(
+                        sec_stat_dict, mode
+                    ).items()
+                ]
+
     # Optionally print checkpoint statistics and some sample segmentations
     if print_sample:
         logger.info(statbar_string(stat_dict))
@@ -446,7 +454,7 @@ def track_and_save_best_model(
     dev_loss = current_metric_dict['dev_loss']
     mcc = current_metric_dict['mcc']
     f1 = current_metric_dict['f1']
-    
+
     # Check if the current checkpoint dev loss is lower than the over best loss.
     # If so, save the model and reset `checkpoints_wo_improvement`. If not,
     # increment the counter of checkpoints without improvement, and check if the
@@ -460,7 +468,8 @@ def track_and_save_best_model(
         model_status_dict['checkpoints_wo_improvement'] += 1
         improvement_stopped = (
             config_early_stopping and
-            model_status_dict['checkpoints_wo_improvement'] >= config_early_stopping
+            model_status_dict['checkpoints_wo_improvement'] >=
+            config_early_stopping
         )
         if improvement_stopped:
             logger.info(
@@ -472,7 +481,7 @@ def track_and_save_best_model(
             logger.info(f"Saved model at step {global_step} as final model")
             model_status_dict['early_stop'] = True
             return model_status_dict
-    
+
     # If not in bpc-only dev mode, compare the current checkpoint dev mcc/f1 to
     # the best mcc/f1 and save the model if it is better
     if dev_mode != 'bpc' and (mcc > model_status_dict['best_mcc']):
@@ -483,7 +492,7 @@ def track_and_save_best_model(
         model_status_dict['best_f1'] = f1
         torch.save(model_checkpoint, args_model_path + '_best_f1.model')
         logger.info(f"New best f1 at step {global_step}")
-    
+
     # If this is the final checkpoint, save the model
     if is_final:
         torch.save(model_checkpoint, args_model_path + '_final.model')
@@ -505,7 +514,10 @@ def train(args, config, dev_config, device, logger) -> None:
     # Tokenize the train file by characters, adding <bos> and <eos>
     # tags
     train_text = wr.character_tokenize(
-        args.train_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
+        args.train_file,
+        preserve_case=config.preserve_case,
+        edge_tokens=True,
+        preserve_tags=config.preserve_tags
     )
 
     pretrained_embeddings = None
@@ -689,16 +701,16 @@ def train(args, config, dev_config, device, logger) -> None:
 
     # Write the metric field headers to the output csv file(s)
     if args.dev_file:
-        primary_dev_metrics =  DEV_METRICS_BY_MODE['both']
+        primary_dev_metrics = DEV_METRICS_BY_MODE['both']
         dev_metric_file_headers = [
-            os.path.basename(args.dev_file) + '_' + metric
+            os.path.basename(args.dev_file) + '-' + metric
             for metric in primary_dev_metrics
         ]
     else:
         # Add the metric headers for the primary dev file/mode
         primary_dev_metrics = DEV_METRICS_BY_MODE[dev_config.primary_dev_mode]
         dev_metric_file_headers = [
-            os.path.basename(dev_config.primary_dev_file) + '_' + metric
+            os.path.basename(dev_config.primary_dev_file) + '-' + metric
             for metric in primary_dev_metrics
         ]
         # Add the headers for each of the secondary dev files according to their
@@ -707,7 +719,7 @@ def train(args, config, dev_config, device, logger) -> None:
             secondary_dev_metrics = DEV_METRICS_BY_MODE[mode]
             for dev_file in dev_config.secondary_dev_files[mode]:
                 dev_metric_file_headers += [
-                    os.path.basename(dev_file) + '_' + metric
+                    os.path.basename(dev_file) + '-' + metric
                     for metric in secondary_dev_metrics
                 ]
 
@@ -766,8 +778,8 @@ def train(args, config, dev_config, device, logger) -> None:
     model.train()
 
     while (
-        global_step < config.max_train_steps
-        and not model_status_dict['early_stop']
+        global_step < config.max_train_steps and
+        not model_status_dict['early_stop']
     ):
         # At the very beginning of training, do an eval run and record baseline
         # metrics, writing to the output metric file
@@ -872,7 +884,8 @@ def train(args, config, dev_config, device, logger) -> None:
                 # Initialize the metrics list with the values from the previous
                 # training batch
                 csv_values = [
-                    global_step, time_per_batch, round(lr, 8),
+                    global_step, time_per_batch,
+                    round(lr, 8),
                     round(current_train_loss, 2)
                 ]
 
@@ -949,7 +962,10 @@ def predict(args, config, device, logger):
     model.eval()
 
     input_text = wr.character_tokenize(
-        args.input_file, preserve_case=config.preserve_case, edge_tokens=True, preserve_tags=config.preserve_tags
+        args.input_file,
+        preserve_case=config.preserve_case,
+        edge_tokens=True,
+        preserve_tags=config.preserve_tags
     )
     input_data = [vocab.to_ids(line) for line in input_text]
     num_lines = len(input_data)
@@ -966,7 +982,8 @@ def predict(args, config, device, logger):
     # gold-standard segmentations for the dev data, which are converted to a
     # binary "boundary" vector using get_boundary_vector
     gold_input_text = [
-        wr.chars_from_words(sent, preserve_tags=config.preserve_tags) for sent in wr.basic_tokenize(
+        wr.chars_from_words(sent, preserve_tags=config.preserve_tags)
+        for sent in wr.basic_tokenize(
             args.input_file,
             preserve_case=config.preserve_case,
             split_tags=config.split_tags
