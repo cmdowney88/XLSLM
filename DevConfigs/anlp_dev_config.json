@@ -1,0 +1,5 @@
+{
+    "primary_dev_file": "Data/AmericasNLP/dev.anlp",
+    "primary_dev_mode": "bpc",
+    "seg_secondary_dev_files": ["Data/KannEtAl2018/dev.hch", "Data/KannEtAl2018/dev.nci"]
+}
