@@ -521,6 +521,7 @@ def train(args, config, dev_config, device, logger) -> None:
     )
 
     pretrained_embeddings = None
+    subword_vocab_file = None
     char_ids_to_subword_id = None
 
     if args.preexisting_model:
@@ -531,8 +532,8 @@ def train(args, config, dev_config, device, logger) -> None:
         checkpoint = torch.load(args.load_model_path + '.model')
         vocab_file = checkpoint['vocab_file']
         vocab = wr.Vocab.from_saved(vocab_file)
-        subword_vocab_file = checkpoint['subword_vocab_file']
-        if subword_vocab_file:
+        if config.use_lexicon:
+            subword_vocab_file = checkpoint['subword_vocab_file']
             char_ids_to_subword_id = import_or_create_subword_vocab(
                 vocab, subword_vocab_file
             )
@@ -540,8 +541,8 @@ def train(args, config, dev_config, device, logger) -> None:
         vocab = wr.Vocab(train_text, other_tokens=['<pad>', '<eoseg>'])
         vocab_file = args.model_path + '_vocab.yaml'
         vocab.save(vocab_file)
-        subword_vocab_file = args.model_path + '_subword_vocab.yaml'
         if config.use_lexicon:
+            subword_vocab_file = args.model_path + '_subword_vocab.yaml'
             char_ids_to_subword_id = import_or_create_subword_vocab(
                 vocab,
                 train_file=args.train_file,
@@ -627,6 +628,12 @@ def train(args, config, dev_config, device, logger) -> None:
     # configuration
     if args.preexisting_model:
         model_architecture = checkpoint['model_architecture']
+        # When re-loading a model, the model's own embeddings should be used,
+        # and the dropout rates should be settable from the new configuration
+        # file
+        model_architecture['pretrained_embedding'] = None
+        model_architecture['model_dropout'] = config.model_dropout
+        model_architecture['encoder_dropout'] = config.encoder_dropout
         model = SegmentalLanguageModel(model_architecture).to(device)
         model.load_state_dict(checkpoint['state_dict'])
     else:
