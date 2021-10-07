@@ -1102,18 +1102,18 @@ def main():
     # Make sure user uses either dev_file or dev_config, not both or neither
     if args.dev_file and args.dev_config:
         raise ValueError(f'Only use --dev_file or --dev_config, not both')
-    if not args.dev_file and not args.dev_config:
-        raise ValueError(f'Must use --dev_file or --dev_config')
+    if not args.dev_file and not args.dev_config and args.mode == 'train':
+        raise ValueError(f'Must use --dev_file or --dev_config if training')
 
     # Read in the configuration file if one is supplied, else use the default
     # configuration
-    if hasattr(args, "config_file"):
+    if args.config_file:
         config = MSLMConfig.from_json(args.config_file)
     else:
         config = MSLMConfig()
 
     # Read in dev configuration file if one is supplied
-    if hasattr(args, "dev_config"):
+    if args.dev_config:
         dev_config = devConfig.from_json(args.dev_config)
         #If there is a dev config file, it must have a primary dev file
         #and a primary dev mode
