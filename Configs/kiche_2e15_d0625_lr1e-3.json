@@ -1,0 +1,20 @@
+{
+    "seed": 1,
+    "model_dim": 256,
+    "pretrained_embedding": "Data/GlobalClassroom/quc_2e15_w2v_32ep",
+    "model_dropout": 0.0625,
+    "num_encoder_layers": 4,
+    "encoder_dim": 256,
+    "num_heads": 4,
+    "feedforward_dim": 512,
+    "encoder_dropout": 0.0625,
+    "smart_position": true,
+    "num_decoder_layers": 1,
+    "max_seg_length": 10,
+    "batch_size": 8192,
+    "batch_by": "tokens",
+    "max_train_steps": 8192,
+    "checkpoint_interval": 128,
+    "num_warmup_steps": 1024,
+    "learning_rate": 0.001
+}
