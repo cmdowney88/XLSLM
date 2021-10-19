@@ -1,32 +1,26 @@
-# Segmental Language Models
+# Crosslingual Segmental Language Model
 
 This repository contains the code from
- _A Masked Segmental Language Model for Natural Language Segmentation_ (2021,
- C.M. Downey, Fei Xia, Gina-Anne Levow and Shane Steinert-Threlkeld). The _mslm_
- package can be used to train and use Segmental Language Models, as first
- described by Sun and Deng (2018) and Kawakami, Dyer, and Blunsom (2019), with
- either the original LSTM-based encoder (a Recurrent SLM), or the span-masking Transformer encoder introduced in the present paper
+ _Multilingual unsupervised sequence segmentation transfers to extremely low-resource languages_ (2021,
+ C.M. Downey, Shannon Drizin, Levon Haroutunian, and Shivin Thukral). The code
+ here is a modified version of the repository from [the original MSLM paper](https://github.com/cmdowney88/SegmentalLMs).
+ The _mslm_ package can be used to train and use Segmental Language Models.
 
-This repository also contains several standard datasets for word-segmentation
- experimentation, as well as utilities and the SIGHAN scoring script (Emerson
- 2005)
+In this repository, we additionally make available our preparation of the
+AmericasNLP 2021 multilingual dataset (see `Data/AmericasNLP`) and the target
+K'iche' data (`Data/GlobalClassroom`).
 
 ## Paper Results
 
 The results from the accompanying paper can be found in the `Output` directory.
  `*.csv` files include statistics from the training run, `*.out` contain the
   model output for the entire corpus, `*.score` contain the segmentation scores
-  of the model output, and `*.bpc` contain the bits-per-character scores for the
-  models on the test sets
+  of the model output.
 
-The results from the original April 2021 pre-print (which we will refer to as
- Experiment Set A) were produced on commit `66e7891`, and should be
- reproduceable through commit `6b33f7a`, which we will consider the official
- version for pre-print v1.0
+The results from the October 2021 pre-print (which we will refer to as
+ Experiment Set A) are reproducible on commit `2b89575`. We will consider this the
+ official commit of the October 2021 pre-print.
  
-The results from v2.0 of the paper (which is under review and which we will refer
-to as Experiment Set B) were produced on commit `820c40e`
-
 ## Usage
 
 The top-level scripts for training and experimentation can be found in
