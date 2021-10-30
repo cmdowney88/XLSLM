@@ -539,6 +539,15 @@ def train(args, config, dev_config, device, logger) -> None:
             )
     else:
         vocab = wr.Vocab(train_text, other_tokens=['<pad>', '<eoseg>'])
+        # add extra chars from file
+        if config.other_vocab:
+            extra_text = wr.character_tokenize(
+                config.other_vocab,
+                preserve_case=config.preserve_case,
+                edge_tokens=True,
+                preserve_tags=config.preserve_tags
+                )
+            vocab.add_source(extra_text)
         vocab_file = args.model_path + '_vocab.yaml'
         vocab.save(vocab_file)
         if config.use_lexicon:
