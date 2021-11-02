@@ -46,7 +46,8 @@ class MSLMConfig():
         learning_rate=0.001,
         gamma=0.8,
         gamma_steps=512,
-        gradient_clip=1.0
+        gradient_clip=1.0,
+        other_vocab=None
     ):
         self.seed = seed
         self.clear_cache_by_batch = clear_cache_by_batch
@@ -87,6 +88,7 @@ class MSLMConfig():
         self.gamma = gamma
         self.gamma_steps = gamma_steps
         self.gradient_clip = gradient_clip
+        self.other_vocab = other_vocab
 
         if self.optimizer_algorithm not in ["sgd", "adam"]:
             raise ValueError(
