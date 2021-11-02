@@ -7,7 +7,7 @@
     "encoder_dim": 256,
     "num_heads": 4,
     "feedforward_dim": 512,
-    "encoder_dropout": 0.125,
+    "encoder_dropout": 0.25,
     "smart_position": true,
     "num_decoder_layers": 1,
     "max_seg_length": 10,
@@ -16,5 +16,5 @@
     "max_train_steps": 16384,
     "checkpoint_interval": 128,
     "num_warmup_steps": 1024,
-    "learning_rate": 0.0006
+    "learning_rate": 0.0005
 }

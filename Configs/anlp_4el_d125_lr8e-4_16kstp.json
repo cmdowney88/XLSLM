@@ -1,6 +1,6 @@
 {
     "seed": 1,
-    "pretrained_embedding": "Data/AmericasNLP/anlp_w2v_32ep",
+    "pretrained_embedding": "Data/AmericasNLP/anlp_downsampled_w2v_32ep",
     "model_dim": 256,
     "model_dropout": 0.0625,
     "num_encoder_layers": 4,
