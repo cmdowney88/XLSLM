@@ -6,7 +6,7 @@
     "encoder_dim": 256,
     "num_heads": 4,
     "feedforward_dim": 512,
-    "encoder_dropout": 0.25,
+    "encoder_dropout": 0.50,
     "smart_position": true,
     "num_decoder_layers": 1,
     "max_seg_length": 10,
