@@ -42,6 +42,7 @@ collection is heavily skewed towards Quechua, we also create
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | All | train.anlp | 259,207 | 2,682,609 | 400,830 | 18,982,453 | 253 | 7.08 |
 | All | train_balanced.anlp | 171,830 | 1,839,631 | 320,331 | 11,981,011 | 241 | 6.51 |
+| All | train_downsampled.anlp | 120,145 | 1,284,440 | 255,392 | 8,365,710 | 221 | 6.51 |
 | Asháninka | train.cni | 3,883 | 26,096 | 12,490 | 232,494 | 65 | 8.91 |
 | Asháninka | train_1.mono.cni | 12,010 | 99,329 | 27,963 | 919,897 | 48 | 9.26 |
 | Asháninka | train_2.mono.cni | 593 | 4,515 | 2,325 | 42,093 | 41 | 9.32 |
