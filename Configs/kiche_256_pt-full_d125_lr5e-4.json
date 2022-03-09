@@ -1,0 +1,19 @@
+{
+    "seed": 1,
+    "model_dim": 256,
+    "model_dropout": 0.0625,
+    "num_encoder_layers": 4,
+    "encoder_dim": 256,
+    "num_heads": 4,
+    "feedforward_dim": 512,
+    "encoder_dropout": 0.125,
+    "smart_position": true,
+    "num_decoder_layers": 1,
+    "max_seg_length": 10,
+    "batch_size": 8192,
+    "batch_by": "tokens",
+    "max_train_steps": 4096,
+    "checkpoint_interval": 64,
+    "num_warmup_steps": 512,
+    "learning_rate": 0.0005
+}
