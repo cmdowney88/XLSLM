@@ -21,6 +21,10 @@ The results from the October 2021 pre-print (which we will refer to as
  Experiment Set A) are reproducible on commit `2b89575`. We will consider this the
  official commit of the October 2021 pre-print.
  
+The results from the second version of the paper, to appear in the [theme track of
+ the ACL 2022 main conference](https://www.2022.aclweb.org/callpapers), were
+ produced on commit `820c40e`.
+ 
 ## Usage
 
 The top-level scripts for training and experimentation can be found in
